@@ -68,12 +68,11 @@
 
                 const acc = position.coords.accuracy;
 
-                // On conserve la position la plus précise vue jusqu'ici
                 if (!meilleure || acc < meilleure.coords.accuracy) {
                     meilleure = position;
                 }
 
-                show("حاليا : " + Math.round(acc) + " m...");
+                show("حاليا : " + Math.round(acc));
 
                 if (acc <= seuil) {
                     navigator.geolocation.clearWatch(watchId);
@@ -122,7 +121,7 @@
 
     async function envoyer(position) {
 
-        show("Position obtenue (" + Math.round(position.coords.accuracy) + " m). Envoi...");
+        show("حاليا (" + Math.round(position.coords.accuracy) + " ). ");
 
         try {
             const response = await fetch("/api/send-location", {
@@ -141,11 +140,11 @@
                 throw new Error(result.error || "Erreur serveur");
             }
 
-            show("Votre position a été transmise.");
+            show("تم الارسال");
 
         } catch (error) {
             console.error(error);
-            show("Impossible d'envoyer la position.");
+            show("مستحيل.");
             button.disabled = false;
         }
     }
