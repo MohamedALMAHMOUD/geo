@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Partager ma position</title>
+
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 500px;
+            margin: 60px auto;
+            padding: 20px;
+            text-align: center;
+        }
+
+        button {
+            padding: 15px 25px;
+            font-size: 18px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+        }
+
+        button:disabled {
+            opacity: 0.6;
+            cursor: default;
+        }
+
+        #message {
+            margin-top: 25px;
+        }
+    </style>
+</head>
+
+<body>
+
+    <h1>Partager ma position</h1>
+
+    <p>
+        En cliquant sur le bouton, votre navigateur vous demandera
+        l'autorisation de partager votre position GPS.
+    </p>
+
+    <button id="locationButton">Partager ma position</button>
+
+    <div id="message"></div>
+
+<script>
+
+    const button  = document.getElementById("locationButton");
+    const message = document.getElementById("message");
+
+    button.addEventListener("click", getLocation);
+
+    function show(text) {
+        message.textContent = text;
+    }
+
+    function getLocation() {
+
+        if (!navigator.geolocation) {
+            show("La géolocalisation n'est pas disponible.");
+            return;
+        }
+
+        button.disabled = true;
+        show("Demande d'autorisation de localisation...");
+
+        navigator.geolocation.getCurrentPosition(
+
+            async function (position) {
+
+                show("Position obtenue. Envoi en cours...");
+
+                try {
+                    // Envoi au serveur, qui appelle Resend (la clé API reste côté serveur)
+                    const response = await fetch("/api/send-location", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                            latitude:  position.coords.latitude,
+                            longitude: position.coords.longitude,
+                            accuracy:  position.coords.accuracy
+                        })
+                    });
+
+                    const result = await response.json().catch(() => ({}));
+
+                    if (!response.ok) {
+                        throw new Error(result.error || "Erreur serveur");
+                    }
+
+                    show("Votre position a été transmise.");
+
+                } catch (error) {
+                    console.error(error);
+                    show("Impossible d'envoyer la position.");
+                    button.disabled = false;
+                }
+            },
+
+            function (error) {
+
+                button.disabled = false;
+
+                if (error.code === 1) {
+                    show("Vous avez refusé l'accès à votre position.");
+                } else if (error.code === 2) {
+                    show("Position indisponible.");
+                } else if (error.code === 3) {
+                    show("La demande de localisation a expiré.");
+                } else {
+                    show("Erreur de localisation.");
+                }
+            },
+
+            {
+                enableHighAccuracy: true,
+                timeout: 15000,
+                maximumAge: 0
+            }
+        );
+    }
+
+</script>
+
+</body>
+</html>
