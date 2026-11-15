@@ -1,0 +1,17 @@
+{
+  "name": "bus-credits",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Recharge de credits pour lignes de bus (Syrie) - API + dashboards client/transporteur, verification ChamCash simulee",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "seed": "node src/seed.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "express": "^4.21.0"
+  }
+}

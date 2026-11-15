@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Bus Credits — Client</title>
+    <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+    <header>
+        <h1>🚌 Bus Credits</h1>
+        <div class="topbar">
+            <span id="whoami" class="muted"></span>
+            <a class="link" href="transporteur.html">Espace transporteur</a>
+            <button id="logoutBtn" class="ghost hidden" style="margin:0;padding:8px 12px">Déconnexion</button>
+        </div>
+    </header>
+
+    <div class="wrap">
+        <!-- ============ AUTH ============ -->
+        <div id="authCard" class="card">
+            <h2>Connexion / Inscription client</h2>
+            <label>Téléphone</label>
+            <input id="phone" placeholder="09xxxxxxxx" />
+            <label>Code PIN (min. 4 chiffres)</label>
+            <input id="pin" type="password" placeholder="••••" />
+            <label id="nameLbl" class="hidden">Nom</label>
+            <input id="name" class="hidden" placeholder="Votre nom" />
+            <div class="row">
+                <button id="loginBtn">Se connecter</button>
+                <button id="registerBtn" class="secondary">Créer un compte</button>
+            </div>
+            <div id="authMsg" class="msg"></div>
+        </div>
+
+        <!-- ============ APP ============ -->
+        <div id="app" class="hidden">
+            <div class="card">
+                <h2>Mon solde</h2>
+                <div class="balance"><span id="balance">0</span> <small>crédits (L.S. nouvelles)</small></div>
+                <p class="muted">1 crédit = 1 L.S. nouvelle = 100 L.S. anciennes. Un trajet coûte en général 35 crédits (3 500 anciennes).</p>
+            </div>
+
+            <div class="card">
+                <h2>Recharger des crédits</h2>
+                <label>Ligne de bus</label>
+                <select id="lineSelect"></select>
+                <label>Montant (crédits)</label>
+                <input id="amount" type="number" value="140" min="1" />
+                <button id="rechargeBtn">Demander la recharge</button>
+                <div id="rechargeInstr" class="instr hidden"></div>
+                <div id="rechargeMsg" class="msg"></div>
+            </div>
+
+            <div class="card">
+                <h2>Prendre un trajet</h2>
+                <label>Ligne</label>
+                <select id="tripLineSelect"></select>
+                <button id="tripBtn" class="secondary">Valider un trajet</button>
+                <div id="tripMsg" class="msg"></div>
+            </div>
+
+            <div class="card">
+                <h2>Historique</h2>
+                <div id="history" class="muted">—</div>
+            </div>
+        </div>
+    </div>
+
+    <script src="client.js"></script>
+</body>
+</html>
