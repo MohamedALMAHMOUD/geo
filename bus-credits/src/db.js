@@ -11,6 +11,7 @@ const EMPTY = {
     users: [],        // { id, phone, name, role: 'client'|'transporteur', pinHash, salt, createdAt }
     lines: [],        // { id, name, ownerId, priceCredits, chamcashAccount, path:[[lat,lng],...] }
     buses: [],        // { id, lineId, label, t, dir, lat, lng, prevLat, prevLng, manual, updatedAt }
+    favorites: [],    // { userId, lineId }
     wallets: [],      // { userId, balanceCredits }
     recharges: [],    // { id, clientId, lineId, amountCredits, reference, status, chamcashRef, createdAt, confirmedAt }
     trips: [],        // { id, clientId, lineId, priceCredits, createdAt }

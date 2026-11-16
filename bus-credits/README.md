@@ -51,6 +51,19 @@ bus-credits/
 4. **Mobile** : emballer l'API dans une app React Native ou Flutter (Android + iOS),
    ou publier les dashboards en PWA.
 
+## Application mobile (Expo React Native)
+Voir `mobile/` (et `mobile/README.md`). Un seul code pour Android + iOS :
+- 🔎 Recherche de ligne **d'un point à un autre** (saisie d'adresse → géocodage → lignes directes)
+- ⭐ **Lignes favorites** (ajout/suppression)
+- 💳 Rechargement ChamCash (simulé) + trajet
+- 🧭 Bus proches dans les deux sens
+
+Lancer : `cd mobile && npm install && npx expo install && npx expo start` (régler `src/config.js` sur l'URL du serveur).
+
+## Recherche d'adresse (données Damas de démo)
+Les lieux et tracés sont dans `src/places.js` (source unique). Le géocodage texte utilise un
+petit gazetteer local (fiable hors ligne) ; à remplacer par un vrai géocodeur plus tard.
+
 ## Endpoints principaux
 | Méthode | Route | Rôle |
 |---|---|---|
@@ -62,3 +75,7 @@ bus-credits/
 | POST | `/api/trip` | client |
 | GET | `/api/transporteur/overview` | transporteur |
 | POST | `/api/transporteur/recharge/:id/confirm` | transporteur |
+| GET | `/api/geocode?q=` | public (adresse → coordonnées) |
+| POST | `/api/search-routes` | public (from/to → lignes directes) |
+| GET/POST/DELETE | `/api/favorites` | client (lignes favorites) |
+| GET | `/api/buses/near?lat=&lng=` | public (bus proches, 2 sens) |

@@ -1,11 +1,13 @@
-// Jeu de donnees de demonstration : 1 transporteur, 2 lignes (avec traces), 3 bus, 1 client.
-// Lancer avec : npm run seed
+// Jeu de donnees de demonstration : reseau de bus de Damas (4 lignes avec arrets + traces),
+// 1 transporteur, 1 client, des bus en mouvement. Lancer avec : npm run seed
 const { data, save, newId } = require("./db");
 const { hashPin } = require("./auth");
+const { LINES_DEF, stopsOf } = require("./places");
 
 data.users.length = 0;
 data.lines.length = 0;
 data.buses.length = 0;
+data.favorites.length = 0;
 data.wallets.length = 0;
 data.recharges.length = 0;
 data.trips.length = 0;
@@ -20,52 +22,37 @@ function mkUser(phone, name, role, pin) {
 }
 
 const transporteur = mkUser("0930000001", "شركة الشام للنقل", "transporteur", "1234");
-const client = mkUser("0940000002", "أحمد الزبون", "client", "1234");
+mkUser("0940000002", "أحمد الزبون", "client", "1234");
 
-// Traces (autour de Damas) : [lat, lng]
-const line1 = {
-    id: newId("line"),
-    name: "الخط ١: وسط المدينة ↔ الجامعة",
-    ownerId: transporteur.id,
-    priceCredits: 35,
-    chamcashAccount: "CHAM-700100",
-    path: [
-        [33.5020, 36.2600],
-        [33.5080, 36.2700],
-        [33.5138, 36.2765],
-        [33.5200, 36.2850],
-        [33.5260, 36.2950]
-    ]
-};
-const line2 = {
-    id: newId("line"),
-    name: "الخط ٢: الكراج ↔ السوق",
-    ownerId: transporteur.id,
-    priceCredits: 35,
-    chamcashAccount: "CHAM-700200",
-    path: [
-        [33.4950, 36.3000],
-        [33.5010, 36.2950],
-        [33.5070, 36.2880],
-        [33.5130, 36.2820]
-    ]
-};
-data.lines.push(line1, line2);
+LINES_DEF.forEach((def) => {
+    const stops = stopsOf(def);
+    const line = {
+        id: newId("line"),
+        name: def.name,
+        ownerId: transporteur.id,
+        priceCredits: 35,
+        chamcashAccount: def.account,
+        stops,
+        path: stops.map((s) => [s.lat, s.lng])
+    };
+    data.lines.push(line);
 
-function mkBus(lineId, label, t, dir) {
-    data.buses.push({
-        id: newId("bus"), lineId, label, t, dir,
-        lat: null, lng: null, prevLat: null, prevLng: null,
-        manual: false, direction: dir > 0 ? "ذهاب" : "إياب", updatedAt: new Date().toISOString()
-    });
-}
-// Deux bus sur la ligne 1 (un dans chaque sens), un bus sur la ligne 2
-mkBus(line1.id, "باص ١-أ", 1.0, 1);   // ذهاب
-mkBus(line1.id, "باص ١-ب", 3.0, -1);  // إياب
-mkBus(line2.id, "باص ٢-أ", 1.0, 1);   // ذهاب
+    for (let i = 0; i < def.buses; i++) {
+        const dir = i % 2 === 0 ? 1 : -1;
+        data.buses.push({
+            id: newId("bus"),
+            lineId: line.id,
+            label: `${def.name.split(":")[0].trim()} • باص ${i + 1}`,
+            t: i % 2 === 0 ? 1.0 : stops.length - 2,
+            dir,
+            lat: null, lng: null, prevLat: null, prevLng: null,
+            manual: false, direction: dir > 0 ? "ذهاب" : "إياب", updatedAt: new Date().toISOString()
+        });
+    }
+});
 
 save();
-console.log("تم إنشاء بيانات العرض:");
+console.log("تم إنشاء شبكة دمشق التجريبية:");
+console.log(`  ${data.lines.length} خطوط، ${data.buses.length} باصات.`);
 console.log("  الناقل : هاتف 0930000001 / الرمز 1234");
 console.log("  الزبون : هاتف 0940000002 / الرمز 1234");
-console.log("  خطان + 3 باصات (محاكاة حركة حيّة).");

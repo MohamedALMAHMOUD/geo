@@ -4,6 +4,7 @@ const { data, save, newId } = require("./db");
 const { hashPin, verifyPin, createSession, requireAuth } = require("./auth");
 const chamcash = require("./chamcash");
 const { distanceMeters } = require("./geo");
+const { searchPlaces } = require("./places");
 
 const BUS_SPEED_KMH = 20; // vitesse moyenne supposee pour estimer le temps d'arrivee
 
@@ -80,6 +81,7 @@ router.get("/lines", (req, res) => {
                 priceCredits: l.priceCredits,
                 chamcashAccount: l.chamcashAccount,
                 path: l.path || [],
+                stops: l.stops || [],
                 owner: owner ? owner.name : null
             };
         })
@@ -366,6 +368,121 @@ router.post("/bus/:id/position", requireAuth("transporteur"), (req, res) => {
     bus.manual = true;
     bus.updatedAt = new Date().toISOString();
     res.json({ bus });
+});
+
+// =========================================================================
+//  GEOCODAGE (عنوان -> إحداثيات) — version demo basee sur un gazetteer local
+// =========================================================================
+router.get("/geocode", (req, res) => {
+    const q = req.query.q || "";
+    // Si on recoit directement "lat,lng"
+    const m = String(q).match(/^\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*$/);
+    if (m) {
+        return res.json({ results: [{ name: q, lat: Number(m[1]), lng: Number(m[2]) }] });
+    }
+    res.json({ results: searchPlaces(q) });
+});
+
+// =========================================================================
+//  RECHERCHE D'ITINERAIRE : من عنوان إلى عنوان (خط مباشر)
+// =========================================================================
+// Pour chaque ligne : trouve l'arret le plus proche du depart (A) et de l'arrivee (B).
+// Si les deux sont a distance de marche ET dans le bon ordre -> la ligne convient.
+function nearestStop(stops, pt) {
+    let best = null;
+    stops.forEach((s, idx) => {
+        const d = distanceMeters(pt, { lat: s.lat, lng: s.lng });
+        if (!best || d < best.d) best = { idx, d, stop: s };
+    });
+    return best;
+}
+
+router.post("/search-routes", (req, res) => {
+    const { from, to, maxWalkMeters } = req.body || {};
+    if (!from || !to || !Number.isFinite(from.lat) || !Number.isFinite(to.lat)) {
+        return res.status(400).json({ error: "from et to (lat/lng) requis." });
+    }
+    const maxWalk = Number(maxWalkMeters) || 900;
+    const favSet = new Set(); // rempli si utilisateur connecte
+    const token = (req.headers.authorization || "").replace(/^Bearer\s+/i, "");
+    const sess = data.sessions.find((x) => x.token === token && x.exp > Date.now());
+    if (sess) data.favorites.filter((f) => f.userId === sess.userId).forEach((f) => favSet.add(f.lineId));
+
+    const AVG_KMH = 20;
+    const results = [];
+
+    for (const line of data.lines) {
+        if (!line.stops || line.stops.length < 2) continue;
+        const a = nearestStop(line.stops, from);
+        const b = nearestStop(line.stops, to);
+        if (!a || !b || a.idx === b.idx) continue;
+        if (a.d > maxWalk || b.d > maxWalk) continue;
+
+        const direction = a.idx < b.idx ? "ذهاب" : "إياب";
+        const lo = Math.min(a.idx, b.idx);
+        const hi = Math.max(a.idx, b.idx);
+
+        // distance a bord (le long des arrets entre A et B)
+        let rideMeters = 0;
+        for (let i = lo; i < hi; i++) {
+            rideMeters += distanceMeters(
+                { lat: line.stops[i].lat, lng: line.stops[i].lng },
+                { lat: line.stops[i + 1].lat, lng: line.stops[i + 1].lng }
+            );
+        }
+        const rideMin = Math.max(1, Math.round((rideMeters / 1000) / AVG_KMH * 60));
+
+        results.push({
+            lineId: line.id,
+            lineName: line.name,
+            priceCredits: line.priceCredits,
+            direction,
+            board: a.stop,                     // محطة الركوب
+            alight: b.stop,                    // محطة النزول
+            walkFromMeters: Math.round(a.d),
+            walkToMeters: Math.round(b.d),
+            rideMeters: Math.round(rideMeters),
+            rideMin,
+            stopsBetween: hi - lo,
+            isFavorite: favSet.has(line.id)
+        });
+    }
+
+    results.sort((x, y) => (x.walkFromMeters + x.walkToMeters) - (y.walkFromMeters + y.walkToMeters) || x.rideMin - y.rideMin);
+    res.json({ from, to, count: results.length, routes: results });
+});
+
+// =========================================================================
+//  LIGNES FAVORITES (الخطوط المفضّلة)
+// =========================================================================
+router.get("/favorites", requireAuth("client"), (req, res) => {
+    const ids = new Set(data.favorites.filter((f) => f.userId === req.user.id).map((f) => f.lineId));
+    const lines = data.lines
+        .filter((l) => ids.has(l.id))
+        .map((l) => ({ id: l.id, name: l.name, priceCredits: l.priceCredits, stops: l.stops || [] }));
+    res.json({ favorites: lines });
+});
+
+router.post("/favorites", requireAuth("client"), (req, res) => {
+    const { lineId } = req.body || {};
+    const line = data.lines.find((l) => l.id === lineId);
+    if (!line) return res.status(404).json({ error: "الخط غير موجود." });
+    if (!data.favorites.find((f) => f.userId === req.user.id && f.lineId === lineId)) {
+        data.favorites.push({ userId: req.user.id, lineId });
+        save();
+    }
+    res.json({ ok: true });
+});
+
+router.delete("/favorites/:lineId", requireAuth("client"), (req, res) => {
+    const before = data.favorites.length;
+    // mutation en place (data est la meme reference que l'objet exporte par db.js)
+    for (let i = data.favorites.length - 1; i >= 0; i--) {
+        const f = data.favorites[i];
+        if (f.userId === req.user.id && f.lineId === req.params.lineId) data.favorites.splice(i, 1);
+    }
+    if (data.favorites.length !== before) save();
+    res.json({ ok: true });
 });
 
 // Un transporteur ajoute un bus a l'une de ses lignes.
