@@ -34,94 +34,112 @@
             <div id="authMsg" class="msg"></div>
         </div>
 
-        <!-- ============ التطبيق ============ -->
+        <!-- ============ التطبيق (صفحات بتبويبات) ============ -->
         <div id="app" class="hidden">
-            <!-- الباصات القريبة -->
-            <div class="card">
-                <h2>🧭 الباصات القريبة مني (الاتجاهان)</h2>
-                <div id="map"></div>
-                <div class="seg" id="dirSeg">
-                    <button data-dir="all" class="active">الكل</button>
-                    <button data-dir="ذهاب">ذهاب</button>
-                    <button data-dir="إياب">إياب</button>
+
+            <!-- صفحة: تخطيط الرحلة -->
+            <section class="page" id="page-plan">
+                <div class="card">
+                    <h2>🧭 خطّط رحلتك (مع التبديل)</h2>
+                    <label>من (نقطة الانطلاق)</label>
+                    <div class="row">
+                        <input id="fromText" placeholder="مثال: المزة" style="flex:3" />
+                        <button id="fromBtn" class="secondary" style="flex:1;margin-top:0">بحث</button>
+                    </div>
+                    <div id="fromCands"></div>
+                    <label>إلى (الوجهة)</label>
+                    <div class="row">
+                        <input id="toText" placeholder="مثال: باب توما" style="flex:3" />
+                        <button id="toBtn" class="secondary" style="flex:1;margin-top:0">بحث</button>
+                    </div>
+                    <div id="toCands"></div>
+                    <button id="searchBtn">خطّط الرحلة</button>
+                    <div id="searchMsg" class="msg"></div>
+                    <div id="routes"></div>
                 </div>
-                <div id="busList" class="muted">اضغط «تحديد موقعي» لعرض الباصات القريبة.</div>
-                <button id="locateBtn" class="secondary">📍 تحديد موقعي وعرض الباصات</button>
-                <div id="busMsg" class="msg"></div>
-            </div>
+            </section>
 
-            <!-- تخطيط رحلة (من/إلى) مع التبديل -->
-            <div class="card">
-                <h2>🧭 خطّط رحلتك (مع التبديل)</h2>
-                <label>من (نقطة الانطلاق)</label>
-                <div class="row">
-                    <input id="fromText" placeholder="مثال: المزة" style="flex:3" />
-                    <button id="fromBtn" class="secondary" style="flex:1;margin-top:0">بحث</button>
+            <!-- صفحة: الباصات القريبة -->
+            <section class="page" id="page-nearby">
+                <div class="card">
+                    <h2>🧭 الباصات القريبة مني (الاتجاهان)</h2>
+                    <div id="map"></div>
+                    <div class="seg" id="dirSeg">
+                        <button data-dir="all" class="active">الكل</button>
+                        <button data-dir="ذهاب">ذهاب</button>
+                        <button data-dir="إياب">إياب</button>
+                    </div>
+                    <div id="busList" class="muted">اضغط «تحديد موقعي» لعرض الباصات القريبة.</div>
+                    <button id="locateBtn" class="secondary">📍 تحديد موقعي وعرض الباصات</button>
+                    <div id="busMsg" class="msg"></div>
                 </div>
-                <div id="fromCands"></div>
-                <label>إلى (الوجهة)</label>
-                <div class="row">
-                    <input id="toText" placeholder="مثال: باب توما" style="flex:3" />
-                    <button id="toBtn" class="secondary" style="flex:1;margin-top:0">بحث</button>
+            </section>
+
+            <!-- صفحة: الرصيد والتذكرة -->
+            <section class="page" id="page-wallet">
+                <div class="card">
+                    <h2>رصيدي</h2>
+                    <div class="balance"><span id="balance">0</span> <small>كريدت (ل.س جديدة)</small></div>
+                    <p class="muted">١ كريدت = ١ ل.س جديدة = ١٠٠ قديمة • الرحلة ٣٥ كريدت.</p>
                 </div>
-                <div id="toCands"></div>
-                <button id="searchBtn">خطّط الرحلة</button>
-                <div id="searchMsg" class="msg"></div>
-                <div id="routes"></div>
-            </div>
 
-            <!-- تذكرة QR -->
-            <div class="card">
-                <h2>🎫 تذكرتي (QR)</h2>
-                <p class="muted">أنشئ تذكرة واعرض رمز QR للسائق أو مرّره أمام جهاز التدقيق لخصم الأجرة.</p>
-                <label>الخط</label>
-                <select id="ticketLine"></select>
-                <button id="genTicket">إنشاء تذكرة QR</button>
-                <div id="ticketBox" class="hidden" style="text-align:center">
-                    <div id="qr" style="display:inline-block;background:#fff;padding:12px;border-radius:12px;margin-top:12px"></div>
-                    <div id="ticketCode" class="muted" style="margin-top:8px;direction:ltr"></div>
-                    <div id="ticketStatus" style="margin-top:8px;font-weight:700"></div>
+                <div class="card">
+                    <h2>🎫 تذكرتي (QR)</h2>
+                    <p class="muted">أنشئ تذكرة واعرض رمز QR للسائق أو مرّره أمام جهاز التدقيق لخصم الأجرة.</p>
+                    <label>الخط</label>
+                    <select id="ticketLine"></select>
+                    <button id="genTicket">إنشاء تذكرة QR</button>
+                    <div id="ticketBox" class="hidden" style="text-align:center">
+                        <div id="qr" style="display:inline-block;background:#fff;padding:12px;border-radius:12px;margin-top:12px"></div>
+                        <div id="ticketCode" class="muted" style="margin-top:8px;direction:ltr"></div>
+                        <div id="ticketStatus" style="margin-top:8px;font-weight:700"></div>
+                    </div>
+                    <div id="ticketMsg" class="msg"></div>
                 </div>
-                <div id="ticketMsg" class="msg"></div>
-            </div>
 
-            <!-- المفضّلة -->
-            <div class="card">
-                <h2>⭐ خطوطي المفضّلة</h2>
-                <div id="favs" class="muted">—</div>
-            </div>
+                <div class="card">
+                    <h2>شحن الرصيد</h2>
+                    <label>خط الباص</label>
+                    <select id="lineSelect"></select>
+                    <label>المبلغ (كريدت)</label>
+                    <input id="amount" type="number" value="140" min="1" />
+                    <button id="rechargeBtn">طلب الشحن</button>
+                    <div id="rechargeInstr" class="instr hidden"></div>
+                    <div id="rechargeMsg" class="msg"></div>
+                </div>
 
-            <div class="card">
-                <h2>رصيدي</h2>
-                <div class="balance"><span id="balance">0</span> <small>كريدت (ل.س جديدة)</small></div>
-                <p class="muted">١ كريدت = ١ ل.س جديدة = ١٠٠ ل.س قديمة. الرحلة عادةً ٣٥ كريدت (٣٥٠٠ قديمة).</p>
-            </div>
+                <div class="card">
+                    <h2>ركوب رحلة</h2>
+                    <label>الخط</label>
+                    <select id="tripLineSelect"></select>
+                    <button id="tripBtn" class="secondary">تأكيد الرحلة</button>
+                    <div id="tripMsg" class="msg"></div>
+                </div>
 
-            <div class="card">
-                <h2>شحن الرصيد</h2>
-                <label>خط الباص</label>
-                <select id="lineSelect"></select>
-                <label>المبلغ (كريدت)</label>
-                <input id="amount" type="number" value="140" min="1" />
-                <button id="rechargeBtn">طلب الشحن</button>
-                <div id="rechargeInstr" class="instr hidden"></div>
-                <div id="rechargeMsg" class="msg"></div>
-            </div>
+                <div class="card">
+                    <h2>السجل</h2>
+                    <div id="history" class="muted">—</div>
+                </div>
+            </section>
 
-            <div class="card">
-                <h2>ركوب رحلة</h2>
-                <label>الخط</label>
-                <select id="tripLineSelect"></select>
-                <button id="tripBtn" class="secondary">تأكيد الرحلة</button>
-                <div id="tripMsg" class="msg"></div>
-            </div>
+            <!-- صفحة: المفضّلة -->
+            <section class="page" id="page-favs">
+                <div class="card">
+                    <h2>⭐ خطوطي المفضّلة</h2>
+                    <div id="favs" class="muted">—</div>
+                </div>
+            </section>
 
-            <div class="card">
-                <h2>السجل</h2>
-                <div id="history" class="muted">—</div>
-            </div>
         </div>
     </div>
+
+    <!-- شريط التنقّل السفلي -->
+    <nav id="bottomNav" class="bottom-nav hidden">
+        <button data-page="plan" class="active"><span class="ico">🧭</span>الرحلة</button>
+        <button data-page="nearby"><span class="ico">🚌</span>القريب</button>
+        <button data-page="wallet"><span class="ico">🎫</span>الرصيد</button>
+        <button data-page="favs"><span class="ico">⭐</span>المفضّلة</button>
+    </nav>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>

@@ -53,8 +53,18 @@ $("logoutBtn").onclick = () => {
     localStorage.removeItem("bc_token"); token = null;
     if (busTimer) clearInterval(busTimer);
     show($("app"), false); show($("authCard"), true); show($("logoutBtn"), false);
+    show($("bottomNav"), false);
     $("whoami").textContent = "";
 };
+
+// ---------- التنقّل بين الصفحات (الشريط السفلي) ----------
+function showPage(name) {
+    document.querySelectorAll(".page").forEach((p) => p.classList.toggle("active", p.id === "page-" + name));
+    document.querySelectorAll(".bottom-nav button").forEach((b) => b.classList.toggle("active", b.dataset.page === name));
+    if (name === "nearby" && map) setTimeout(() => map.invalidateSize(), 120);
+    window.scrollTo(0, 0);
+}
+document.querySelectorAll(".bottom-nav button").forEach((b) => b.onclick = () => showPage(b.dataset.page));
 
 // ---------- التطبيق ----------
 async function boot() {
@@ -63,6 +73,8 @@ async function boot() {
         if (user.role !== "client") { msg($("authMsg"), "هذا الحساب خاص بالناقل. استخدم حساب الناقل.", false); return; }
         $("whoami").textContent = user.name + " (زبون)";
         show($("authCard"), false); show($("app"), true); show($("logoutBtn"), true);
+        show($("bottomNav"), true);
+        showPage("plan");
         await loadLines(); await refresh(); initMap();
     } catch { localStorage.removeItem("bc_token"); token = null; }
 }
