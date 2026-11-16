@@ -59,58 +59,74 @@ export default function SearchScreen() {
     const [toText, setToText] = useState("");
     const [from, setFrom] = useState(null);
     const [to, setTo] = useState(null);
-    const [routes, setRoutes] = useState(null);
+    const [itin, setItin] = useState(null);
+    const [favIds, setFavIds] = useState(new Set());
     const [busy, setBusy] = useState(false);
     const [err, setErr] = useState("");
 
     async function search() {
-        setErr(""); setBusy(true); setRoutes(null);
+        setErr(""); setBusy(true); setItin(null);
         try {
-            const data = await api("/search-routes", { method: "POST", body: { from, to } });
-            setRoutes(data.routes);
+            const [{ itineraries }, favRes] = await Promise.all([
+                api("/plan", { method: "POST", body: { from, to } }),
+                api("/favorites").catch(() => ({ favorites: [] }))
+            ]);
+            setFavIds(new Set((favRes.favorites || []).map((f) => f.id)));
+            setItin(itineraries[0] || null);
+            if (!itineraries.length) setErr("لا يوجد مسار بين هذين المكانين عبر الشبكة الحالية.");
         } catch (e) { setErr(e.message); } finally { setBusy(false); }
     }
 
-    async function toggleFav(r) {
+    async function toggleFav(lineId) {
+        const isFav = favIds.has(lineId);
         try {
-            if (r.isFavorite) await api("/favorites/" + r.lineId, { method: "DELETE" });
-            else await api("/favorites", { method: "POST", body: { lineId: r.lineId } });
-            setRoutes((prev) => prev.map((x) => x.lineId === r.lineId ? { ...x, isFavorite: !x.isFavorite } : x));
+            if (isFav) await api("/favorites/" + lineId, { method: "DELETE" });
+            else await api("/favorites", { method: "POST", body: { lineId } });
+            setFavIds((prev) => { const n = new Set(prev); isFav ? n.delete(lineId) : n.add(lineId); return n; });
         } catch {}
     }
 
     return (
         <ScrollView style={S.screen} contentContainerStyle={S.content}>
-            <Text style={S.h1}>🔎 ابحث عن خط</Text>
+            <Text style={S.h1}>🧭 خطّط رحلتك</Text>
             <View style={S.card}>
                 <PlaceField title="من (نقطة الانطلاق)" text={fromText} setText={setFromText} place={from} setPlace={setFrom} />
                 <PlaceField title="إلى (الوجهة)" text={toText} setText={setToText} place={to} setPlace={setTo} />
                 {!!err && <Text style={S.msgErr}>{err}</Text>}
-                <Btn title={busy ? "جارٍ البحث..." : "ابحث عن الخطوط"} onPress={search} disabled={busy || !from || !to} />
+                <Btn title={busy ? "جارٍ التخطيط..." : "خطّط الرحلة"} onPress={search} disabled={busy || !from || !to} />
             </View>
 
-            {routes && routes.length === 0 && (
-                <View style={S.card}><Text style={S.muted}>لا يوجد خط مباشر بين هذين المكانين. جرّب نقطة أقرب.</Text></View>
-            )}
-
-            {routes && routes.map((r) => (
-                <View key={r.lineId} style={S.card}>
-                    <View style={[S.row, { justifyContent: "space-between" }]}>
-                        <Text style={[S.text, { fontWeight: "700", flex: 1 }]}>{r.lineName}</Text>
-                        <TouchableOpacity onPress={() => toggleFav(r)}>
-                            <Text style={{ fontSize: 22 }}>{r.isFavorite ? "⭐" : "☆"}</Text>
-                        </TouchableOpacity>
-                    </View>
-                    <View style={[S.row, { marginTop: 6, gap: 6 }]}>
-                        <DirTag direction={r.direction} />
-                        <Text style={S.muted}>{r.priceCredits} كريدت • ~{r.rideMin} دقيقة</Text>
-                    </View>
+            {itin && (
+                <View style={S.card}>
+                    <Text style={[S.text, { fontWeight: "800", fontSize: 16 }]}>
+                        ⏱️ ~{itin.totalMin} دقيقة • 🔁 {itin.transfers} تبديل • 💳 {itin.fareCredits} كريدت
+                    </Text>
                     <Divider />
-                    <Text style={S.text}>🚏 اركب من: <Text style={{ fontWeight: "700" }}>{r.board.name}</Text>  (مشي {r.walkFromMeters} م)</Text>
-                    <Text style={[S.text, { marginTop: 4 }]}>🏁 انزل في: <Text style={{ fontWeight: "700" }}>{r.alight.name}</Text>  (مشي {r.walkToMeters} م)</Text>
-                    <Text style={[S.muted, { marginTop: 4 }]}>عدد المحطات بينهما: {r.stopsBetween}</Text>
+                    {itin.legs.map((l, i) => {
+                        if (l.type === "walk") return (
+                            <Text key={i} style={[S.text, { paddingVertical: 6 }]}>🚶 مشي: <Text style={{ fontWeight: "700" }}>{l.fromName}</Text> ← <Text style={{ fontWeight: "700" }}>{l.toName}</Text> <Text style={S.muted}>(~{l.min} د)</Text></Text>
+                        );
+                        if (l.type === "transfer") return (
+                            <Text key={i} style={[{ color: "#f59e0b", paddingVertical: 6, textAlign: "right", writingDirection: "rtl" }]}>🔁 تبديل في <Text style={{ fontWeight: "700" }}>{l.atName}</Text> (~{l.min} د)</Text>
+                        );
+                        return (
+                            <View key={i} style={{ paddingVertical: 8, borderTopWidth: 1, borderTopColor: "#2a3850" }}>
+                                <View style={[S.row, { justifyContent: "space-between" }]}>
+                                    <Text style={[S.text, { fontWeight: "700", flex: 1 }]}>🚌 {l.lineName}</Text>
+                                    <TouchableOpacity onPress={() => toggleFav(l.lineId)}>
+                                        <Text style={{ fontSize: 20 }}>{favIds.has(l.lineId) ? "⭐" : "☆"}</Text>
+                                    </TouchableOpacity>
+                                </View>
+                                <View style={[S.row, { gap: 6, marginVertical: 4 }]}>
+                                    <DirTag direction={l.direction} />
+                                    <Text style={S.muted}>{l.min} د • {l.stops} محطات</Text>
+                                </View>
+                                <Text style={S.text}>اركب من <Text style={{ fontWeight: "700" }}>{l.boardName}</Text> وانزل في <Text style={{ fontWeight: "700" }}>{l.alightName}</Text></Text>
+                            </View>
+                        );
+                    })}
                 </View>
-            ))}
+            )}
         </ScrollView>
     );
 }

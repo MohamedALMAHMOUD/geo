@@ -30,7 +30,7 @@ function LogoutButton() {
     );
 }
 
-const ICONS = { بحث: "🔎", المفضّلة: "⭐", رصيدي: "💳", القريب: "🧭" };
+const ICONS = { الرحلة: "🧭", المفضّلة: "⭐", رصيدي: "🎫", القريب: "🚌" };
 
 function Tabs() {
     return (
@@ -46,7 +46,7 @@ function Tabs() {
                 tabBarIcon: ({ color }) => <Text style={{ fontSize: 20, color }}>{ICONS[route.name] || "•"}</Text>
             })}
         >
-            <Tab.Screen name="بحث" component={SearchScreen} />
+            <Tab.Screen name="الرحلة" component={SearchScreen} />
             <Tab.Screen name="المفضّلة" component={FavoritesScreen} />
             <Tab.Screen name="رصيدي" component={WalletScreen} />
             <Tab.Screen name="القريب" component={NearbyScreen} />

@@ -1,6 +1,7 @@
-import React, { useCallback, useState } from "react";
+import React, { useCallback, useRef, useState } from "react";
 import { ScrollView, Text, TextInput, TouchableOpacity, View, RefreshControl } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
+import QRCode from "react-native-qrcode-svg";
 import { C, S } from "../theme";
 import { Btn, Divider } from "../components";
 import { api } from "../api";
@@ -14,6 +15,8 @@ export default function WalletScreen() {
     const [instr, setInstr] = useState(null);
     const [msg, setMsg] = useState(null);
     const [loading, setLoading] = useState(false);
+    const [ticket, setTicket] = useState(null);      // { id, payload, status }
+    const ticketPoll = useRef(null);
 
     const load = useCallback(async () => {
         setLoading(true);
@@ -48,6 +51,24 @@ export default function WalletScreen() {
     async function takeTrip() {
         try { const d = await api("/trip", { method: "POST", body: { lineId } }); note("تمت الرحلة 🚌 الرصيد: " + d.balanceCredits); load(); }
         catch (e) { note(e.message, false); }
+    }
+
+    async function createTicket() {
+        setMsg(null);
+        try {
+            const { ticket: t, qrPayload } = await api("/ticket/create", { method: "POST", body: { lineId } });
+            setTicket({ id: t.id, payload: qrPayload, status: "active" });
+            if (ticketPoll.current) clearInterval(ticketPoll.current);
+            ticketPoll.current = setInterval(async () => {
+                try {
+                    const { ticket: tt } = await api("/ticket/" + t.id);
+                    if (tt.status !== "active") {
+                        setTicket((prev) => prev ? { ...prev, status: tt.status } : prev);
+                        clearInterval(ticketPoll.current); load();
+                    }
+                } catch { clearInterval(ticketPoll.current); }
+            }, 3000);
+        } catch (e) { note(e.message, false); }
     }
 
     return (
@@ -85,6 +106,23 @@ export default function WalletScreen() {
                     </View>
                 )}
                 {msg && <Text style={msg.ok ? S.msgOk : S.msgErr}>{msg.text}</Text>}
+            </View>
+
+            <View style={S.card}>
+                <Text style={[S.text, { fontWeight: "700", marginBottom: 6 }]}>🎫 تذكرتي (QR)</Text>
+                <Text style={S.muted}>أنشئ تذكرة واعرض رمز QR للسائق أو مرّره أمام جهاز التدقيق.</Text>
+                <Btn title="إنشاء تذكرة QR" onPress={createTicket} disabled={!lineId} />
+                {ticket && (
+                    <View style={{ alignItems: "center", marginTop: 12 }}>
+                        <View style={{ backgroundColor: "#fff", padding: 14, borderRadius: 12 }}>
+                            <QRCode value={ticket.payload} size={190} />
+                        </View>
+                        <Text style={[S.muted, { marginTop: 8, direction: "ltr" }]}>{ticket.payload}</Text>
+                        {ticket.status === "active" && <Text style={{ color: "#f59e0b", fontWeight: "700", marginTop: 6 }}>⏳ بانتظار التدقيق… اعرض الرمز للسائق</Text>}
+                        {ticket.status === "used" && <Text style={{ color: C.accent, fontWeight: "700", marginTop: 6 }}>✅ تم التحقق وخُصمت الأجرة</Text>}
+                        {ticket.status === "expired" && <Text style={{ color: C.danger, fontWeight: "700", marginTop: 6 }}>⌛ انتهت صلاحية التذكرة</Text>}
+                    </View>
+                )}
             </View>
 
             <View style={S.card}>
