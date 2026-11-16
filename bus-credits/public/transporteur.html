@@ -33,61 +33,81 @@
         </div>
 
         <div id="app" class="hidden">
-            <div class="card">
-                <h2>نظرة عامة</h2>
-                <div class="grid3">
-                    <div class="stat"><b id="sPending">0</b><span>طلبات شحن معلّقة</span></div>
-                    <div class="stat"><b id="sRevenue">0</b><span>كريدت مُباع</span></div>
-                    <div class="stat"><b id="sTrips">0</b><span>رحلات</span></div>
+
+            <!-- صفحة: نظرة عامة + الخطوط -->
+            <section class="page" id="page-overview">
+                <div class="card">
+                    <h2>نظرة عامة</h2>
+                    <div class="grid3">
+                        <div class="stat"><b id="sPending">0</b><span>طلبات شحن معلّقة</span></div>
+                        <div class="stat"><b id="sRevenue">0</b><span>كريدت مُباع</span></div>
+                        <div class="stat"><b id="sTrips">0</b><span>رحلات</span></div>
+                    </div>
                 </div>
-            </div>
-
-            <div class="card">
-                <h2>🎫 قارئ التذاكر (QR)</h2>
-                <p class="muted">امسح رمز QR للراكب بالكاميرا، أو أدخل الرمز يدويًا، لخصم الأجرة من رصيده.</p>
-                <div id="reader" style="width:100%;max-width:320px;margin:0 auto;border-radius:12px;overflow:hidden"></div>
-                <div class="row" style="margin-top:10px">
-                    <button id="scanBtn" class="secondary" style="flex:1">📷 تشغيل الكاميرا</button>
-                    <button id="scanStop" class="ghost" style="flex:1">إيقاف</button>
+                <div class="card">
+                    <h2>خطوطي</h2>
+                    <div id="lines"></div>
+                    <hr style="border-color:#2a3850;margin:14px 0" />
+                    <b class="muted">إضافة خط</b>
+                    <label>الاسم</label>
+                    <input id="lName" placeholder="الخط ٥: ..." />
+                    <div class="row">
+                        <div><label>سعر الرحلة (كريدت)</label><input id="lPrice" type="number" value="35" /></div>
+                        <div><label>حساب شام كاش</label><input id="lAccount" placeholder="CHAM-700500" /></div>
+                    </div>
+                    <button id="addLineBtn" class="secondary">إضافة الخط</button>
+                    <div id="lineMsg" class="msg"></div>
                 </div>
-                <label>أو أدخل الرمز يدويًا</label>
-                <input id="codeInput" placeholder="BUSQR:..." style="direction:ltr" />
-                <button id="validateBtn">تحقّق من التذكرة</button>
-                <div id="validateResult"></div>
-            </div>
+            </section>
 
-            <div class="card">
-                <h2>باصاتي ومواقعها</h2>
-                <div id="buses" class="muted">—</div>
-            </div>
-
-            <div class="card">
-                <h2>خطوطي</h2>
-                <div id="lines"></div>
-                <hr style="border-color:#2a3850;margin:14px 0" />
-                <b class="muted">إضافة خط</b>
-                <label>الاسم</label>
-                <input id="lName" placeholder="الخط ٣: ..." />
-                <div class="row">
-                    <div><label>سعر الرحلة (كريدت)</label><input id="lPrice" type="number" value="35" /></div>
-                    <div><label>حساب شام كاش</label><input id="lAccount" placeholder="CHAM-700300" /></div>
+            <!-- صفحة: قارئ التذاكر -->
+            <section class="page" id="page-tickets">
+                <div class="card">
+                    <h2>🎫 قارئ التذاكر (QR)</h2>
+                    <p class="muted">امسح رمز QR للراكب بالكاميرا، أو أدخل الرمز يدويًا، لخصم الأجرة من رصيده.</p>
+                    <div id="reader" style="width:100%;max-width:320px;margin:0 auto;border-radius:12px;overflow:hidden"></div>
+                    <div class="row" style="margin-top:10px">
+                        <button id="scanBtn" class="secondary" style="flex:1">📷 تشغيل الكاميرا</button>
+                        <button id="scanStop" class="ghost" style="flex:1">إيقاف</button>
+                    </div>
+                    <label>أو أدخل الرمز يدويًا</label>
+                    <input id="codeInput" placeholder="BUSQR:..." style="direction:ltr" />
+                    <button id="validateBtn">تحقّق من التذكرة</button>
+                    <div id="validateResult"></div>
                 </div>
-                <button id="addLineBtn" class="secondary">إضافة الخط</button>
-                <div id="lineMsg" class="msg"></div>
-            </div>
+            </section>
 
-            <div class="card">
-                <h2>طلبات الشحن الواردة</h2>
-                <div id="recharges" class="muted">—</div>
-            </div>
+            <!-- صفحة: الطلبات + تحويلات شام كاش -->
+            <section class="page" id="page-recharges">
+                <div class="card">
+                    <h2>طلبات الشحن الواردة</h2>
+                    <div id="recharges" class="muted">—</div>
+                </div>
+                <div class="card">
+                    <h2>تحويلات شام كاش (محاكاة)</h2>
+                    <p class="muted">ما «يراه» حساب شام كاش واردًا. في الإنتاج يُستبدل بالـ API الحقيقي لشام كاش.</p>
+                    <div id="ledger" class="muted">—</div>
+                </div>
+            </section>
 
-            <div class="card">
-                <h2>تحويلات شام كاش (محاكاة)</h2>
-                <p class="muted">ما «يراه» حساب شام كاش واردًا. في الإنتاج يُستبدل بالـ API الحقيقي لشام كاش.</p>
-                <div id="ledger" class="muted">—</div>
-            </div>
+            <!-- صفحة: الباصات -->
+            <section class="page" id="page-buses">
+                <div class="card">
+                    <h2>باصاتي ومواقعها</h2>
+                    <div id="buses" class="muted">—</div>
+                </div>
+            </section>
+
         </div>
     </div>
+
+    <!-- شريط التنقّل السفلي -->
+    <nav id="bottomNav" class="bottom-nav hidden">
+        <button data-page="overview" class="active"><span class="ico">📊</span>عام</button>
+        <button data-page="tickets"><span class="ico">🎫</span>التذاكر</button>
+        <button data-page="recharges"><span class="ico">📥</span>الطلبات</button>
+        <button data-page="buses"><span class="ico">🚌</span>الباصات</button>
+    </nav>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
     <script src="transporteur.js"></script>

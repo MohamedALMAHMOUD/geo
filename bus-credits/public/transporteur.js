@@ -43,8 +43,17 @@ async function doAuth(path, extra) {
 $("logoutBtn").onclick = () => {
     localStorage.removeItem("bc_token_t"); token = null;
     if (window._busTimer) clearInterval(window._busTimer);
-    show($("app"), false); show($("authCard"), true); show($("logoutBtn"), false); $("whoami").textContent = "";
+    show($("app"), false); show($("authCard"), true); show($("logoutBtn"), false);
+    show($("bottomNav"), false); $("whoami").textContent = "";
 };
+
+// ---------- التنقّل بين الصفحات (الشريط السفلي) ----------
+function showPage(name) {
+    document.querySelectorAll(".page").forEach((p) => p.classList.toggle("active", p.id === "page-" + name));
+    document.querySelectorAll(".bottom-nav button").forEach((b) => b.classList.toggle("active", b.dataset.page === name));
+    window.scrollTo(0, 0);
+}
+document.querySelectorAll(".bottom-nav button").forEach((b) => b.onclick = () => showPage(b.dataset.page));
 
 async function boot() {
     try {
@@ -52,6 +61,7 @@ async function boot() {
         if (user.role !== "transporteur") { msg($("authMsg"), "هذا الحساب خاص بالزبون. استخدم حساب الزبون.", false); return; }
         $("whoami").textContent = user.name + " (ناقل)";
         show($("authCard"), false); show($("app"), true); show($("logoutBtn"), true);
+        show($("bottomNav"), true); showPage("overview");
         await refresh();
         if (window._busTimer) clearInterval(window._busTimer);
         window._busTimer = setInterval(refresh, 4000); // تحديث حيّ
