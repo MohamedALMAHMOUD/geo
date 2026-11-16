@@ -1,72 +1,88 @@
 <!DOCTYPE html>
-<html lang="fr">
+<html lang="ar" dir="rtl">
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Bus Credits — Client</title>
+    <title>رصيد الباص — الزبون</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
     <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
     <header>
-        <h1>🚌 Bus Credits</h1>
+        <h1>🚌 رصيد الباص</h1>
         <div class="topbar">
             <span id="whoami" class="muted"></span>
-            <a class="link" href="transporteur.html">Espace transporteur</a>
-            <button id="logoutBtn" class="ghost hidden" style="margin:0;padding:8px 12px">Déconnexion</button>
+            <a class="link" href="transporteur.html">حساب الناقل</a>
+            <button id="logoutBtn" class="ghost hidden" style="margin:0;padding:8px 12px">تسجيل الخروج</button>
         </div>
     </header>
 
     <div class="wrap">
-        <!-- ============ AUTH ============ -->
+        <!-- ============ تسجيل الدخول ============ -->
         <div id="authCard" class="card">
-            <h2>Connexion / Inscription client</h2>
-            <label>Téléphone</label>
+            <h2>تسجيل الدخول / إنشاء حساب (زبون)</h2>
+            <label>رقم الهاتف</label>
             <input id="phone" placeholder="09xxxxxxxx" />
-            <label>Code PIN (min. 4 chiffres)</label>
+            <label>الرمز السري (4 أرقام على الأقل)</label>
             <input id="pin" type="password" placeholder="••••" />
-            <label id="nameLbl" class="hidden">Nom</label>
-            <input id="name" class="hidden" placeholder="Votre nom" />
+            <label id="nameLbl" class="hidden">الاسم</label>
+            <input id="name" class="hidden" placeholder="اسمك" />
             <div class="row">
-                <button id="loginBtn">Se connecter</button>
-                <button id="registerBtn" class="secondary">Créer un compte</button>
+                <button id="loginBtn">دخول</button>
+                <button id="registerBtn" class="secondary">إنشاء حساب</button>
             </div>
             <div id="authMsg" class="msg"></div>
         </div>
 
-        <!-- ============ APP ============ -->
+        <!-- ============ التطبيق ============ -->
         <div id="app" class="hidden">
+            <!-- الباصات القريبة -->
             <div class="card">
-                <h2>Mon solde</h2>
-                <div class="balance"><span id="balance">0</span> <small>crédits (L.S. nouvelles)</small></div>
-                <p class="muted">1 crédit = 1 L.S. nouvelle = 100 L.S. anciennes. Un trajet coûte en général 35 crédits (3 500 anciennes).</p>
+                <h2>🧭 الباصات القريبة مني (الاتجاهان)</h2>
+                <div id="map"></div>
+                <div class="seg" id="dirSeg">
+                    <button data-dir="all" class="active">الكل</button>
+                    <button data-dir="ذهاب">ذهاب</button>
+                    <button data-dir="إياب">إياب</button>
+                </div>
+                <div id="busList" class="muted">اضغط «تحديد موقعي» لعرض الباصات القريبة.</div>
+                <button id="locateBtn" class="secondary">📍 تحديد موقعي وعرض الباصات</button>
+                <div id="busMsg" class="msg"></div>
             </div>
 
             <div class="card">
-                <h2>Recharger des crédits</h2>
-                <label>Ligne de bus</label>
+                <h2>رصيدي</h2>
+                <div class="balance"><span id="balance">0</span> <small>كريدت (ل.س جديدة)</small></div>
+                <p class="muted">١ كريدت = ١ ل.س جديدة = ١٠٠ ل.س قديمة. الرحلة عادةً ٣٥ كريدت (٣٥٠٠ قديمة).</p>
+            </div>
+
+            <div class="card">
+                <h2>شحن الرصيد</h2>
+                <label>خط الباص</label>
                 <select id="lineSelect"></select>
-                <label>Montant (crédits)</label>
+                <label>المبلغ (كريدت)</label>
                 <input id="amount" type="number" value="140" min="1" />
-                <button id="rechargeBtn">Demander la recharge</button>
+                <button id="rechargeBtn">طلب الشحن</button>
                 <div id="rechargeInstr" class="instr hidden"></div>
                 <div id="rechargeMsg" class="msg"></div>
             </div>
 
             <div class="card">
-                <h2>Prendre un trajet</h2>
-                <label>Ligne</label>
+                <h2>ركوب رحلة</h2>
+                <label>الخط</label>
                 <select id="tripLineSelect"></select>
-                <button id="tripBtn" class="secondary">Valider un trajet</button>
+                <button id="tripBtn" class="secondary">تأكيد الرحلة</button>
                 <div id="tripMsg" class="msg"></div>
             </div>
 
             <div class="card">
-                <h2>Historique</h2>
+                <h2>السجل</h2>
                 <div id="history" class="muted">—</div>
             </div>
         </div>
     </div>
 
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
     <script src="client.js"></script>
 </body>
 </html>

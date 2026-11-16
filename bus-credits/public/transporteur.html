@@ -1,70 +1,75 @@
 <!DOCTYPE html>
-<html lang="fr">
+<html lang="ar" dir="rtl">
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Bus Credits — Transporteur</title>
+    <title>رصيد الباص — الناقل</title>
     <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
     <header>
-        <h1>🚍 Espace Transporteur</h1>
+        <h1>🚍 حساب الناقل</h1>
         <div class="topbar">
             <span id="whoami" class="muted"></span>
-            <a class="link" href="index.html">Espace client</a>
-            <button id="logoutBtn" class="ghost hidden" style="margin:0;padding:8px 12px">Déconnexion</button>
+            <a class="link" href="index.html">حساب الزبون</a>
+            <button id="logoutBtn" class="ghost hidden" style="margin:0;padding:8px 12px">تسجيل الخروج</button>
         </div>
     </header>
 
     <div class="wrap">
         <div id="authCard" class="card">
-            <h2>Connexion / Inscription transporteur</h2>
-            <label>Téléphone</label>
+            <h2>تسجيل الدخول / إنشاء حساب (ناقل)</h2>
+            <label>رقم الهاتف</label>
             <input id="phone" placeholder="09xxxxxxxx" />
-            <label>Code PIN</label>
+            <label>الرمز السري</label>
             <input id="pin" type="password" placeholder="••••" />
-            <label id="nameLbl" class="hidden">Nom de la compagnie</label>
-            <input id="name" class="hidden" placeholder="Nom de la compagnie" />
+            <label id="nameLbl" class="hidden">اسم الشركة</label>
+            <input id="name" class="hidden" placeholder="اسم شركة النقل" />
             <div class="row">
-                <button id="loginBtn">Se connecter</button>
-                <button id="registerBtn" class="secondary">Créer un compte</button>
+                <button id="loginBtn">دخول</button>
+                <button id="registerBtn" class="secondary">إنشاء حساب</button>
             </div>
             <div id="authMsg" class="msg"></div>
         </div>
 
         <div id="app" class="hidden">
             <div class="card">
-                <h2>Vue d'ensemble</h2>
+                <h2>نظرة عامة</h2>
                 <div class="grid3">
-                    <div class="stat"><b id="sPending">0</b><span>recharges en attente</span></div>
-                    <div class="stat"><b id="sRevenue">0</b><span>crédits vendus</span></div>
-                    <div class="stat"><b id="sTrips">0</b><span>trajets effectués</span></div>
+                    <div class="stat"><b id="sPending">0</b><span>طلبات شحن معلّقة</span></div>
+                    <div class="stat"><b id="sRevenue">0</b><span>كريدت مُباع</span></div>
+                    <div class="stat"><b id="sTrips">0</b><span>رحلات</span></div>
                 </div>
             </div>
 
             <div class="card">
-                <h2>Mes lignes</h2>
+                <h2>باصاتي ومواقعها</h2>
+                <div id="buses" class="muted">—</div>
+            </div>
+
+            <div class="card">
+                <h2>خطوطي</h2>
                 <div id="lines"></div>
                 <hr style="border-color:#2a3850;margin:14px 0" />
-                <b class="muted">Ajouter une ligne</b>
-                <label>Nom</label>
-                <input id="lName" placeholder="Ligne 3 : ..." />
+                <b class="muted">إضافة خط</b>
+                <label>الاسم</label>
+                <input id="lName" placeholder="الخط ٣: ..." />
                 <div class="row">
-                    <div><label>Prix du trajet (crédits)</label><input id="lPrice" type="number" value="35" /></div>
-                    <div><label>Compte ChamCash</label><input id="lAccount" placeholder="CHAM-700300" /></div>
+                    <div><label>سعر الرحلة (كريدت)</label><input id="lPrice" type="number" value="35" /></div>
+                    <div><label>حساب شام كاش</label><input id="lAccount" placeholder="CHAM-700300" /></div>
                 </div>
-                <button id="addLineBtn" class="secondary">Ajouter la ligne</button>
+                <button id="addLineBtn" class="secondary">إضافة الخط</button>
                 <div id="lineMsg" class="msg"></div>
             </div>
 
             <div class="card">
-                <h2>Recharges reçues</h2>
+                <h2>طلبات الشحن الواردة</h2>
                 <div id="recharges" class="muted">—</div>
             </div>
 
             <div class="card">
-                <h2>Transferts ChamCash (simulé)</h2>
-                <p class="muted">Ce que votre compte ChamCash « voit » arriver. En production, remplacé par l'API ChamCash réelle.</p>
+                <h2>تحويلات شام كاش (محاكاة)</h2>
+                <p class="muted">ما «يراه» حساب شام كاش واردًا. في الإنتاج يُستبدل بالـ API الحقيقي لشام كاش.</p>
                 <div id="ledger" class="muted">—</div>
             </div>
         </div>

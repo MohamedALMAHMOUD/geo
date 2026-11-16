@@ -3,6 +3,9 @@ const express = require("express");
 const { data, save, newId } = require("./db");
 const { hashPin, verifyPin, createSession, requireAuth } = require("./auth");
 const chamcash = require("./chamcash");
+const { distanceMeters } = require("./geo");
+
+const BUS_SPEED_KMH = 20; // vitesse moyenne supposee pour estimer le temps d'arrivee
 
 const router = express.Router();
 
@@ -76,6 +79,7 @@ router.get("/lines", (req, res) => {
                 name: l.name,
                 priceCredits: l.priceCredits,
                 chamcashAccount: l.chamcashAccount,
+                path: l.path || [],
                 owner: owner ? owner.name : null
             };
         })
@@ -255,9 +259,17 @@ router.get("/transporteur/overview", requireAuth("transporteur"), (req, res) => 
     // Ce que ChamCash "voit" arriver sur les comptes du transporteur (simule)
     const ledger = myLines.flatMap((l) => chamcash.listLedger(l.chamcashAccount));
 
+    const buses = data.buses
+        .filter((b) => myLineIds.has(b.lineId))
+        .map((b) => {
+            const line = myLines.find((l) => l.id === b.lineId);
+            return { id: b.id, label: b.label, lineName: line ? line.name : "?", direction: b.direction, lat: b.lat, lng: b.lng, manual: b.manual, updatedAt: b.updatedAt };
+        });
+
     res.json({
         lines: myLines,
         recharges,
+        buses,
         stats: {
             pending: recharges.filter((r) => r.status === "pending").length,
             confirmed: confirmed.length,
@@ -295,6 +307,80 @@ router.post("/transporteur/recharge/:id/reject", requireAuth("transporteur"), (r
     rc.status = "rejected";
     save();
     res.json({ recharge: rc });
+});
+
+// =========================================================================
+//  SUIVI DES BUS EN TEMPS REEL (les deux sens : ذهاب / إياب)
+// =========================================================================
+// Bus proches d'un point (position du client). Pour chaque bus : distance,
+// temps estime, sens, et s'il "se rapproche" (il etait plus loin a l'instant d'avant).
+router.get("/buses/near", (req, res) => {
+    const lat = Number(req.query.lat);
+    const lng = Number(req.query.lng);
+    const radiusKm = Number(req.query.radiusKm) || 5;
+    const lineId = req.query.lineId || null;
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+        return res.status(400).json({ error: "lat et lng requis." });
+    }
+    const me = { lat, lng };
+
+    const buses = data.buses
+        .filter((bus) => bus.lat != null && (!lineId || bus.lineId === lineId))
+        .map((bus) => {
+            const line = data.lines.find((l) => l.id === bus.lineId);
+            const d = distanceMeters(me, { lat: bus.lat, lng: bus.lng });
+            const dPrev = (bus.prevLat != null)
+                ? distanceMeters(me, { lat: bus.prevLat, lng: bus.prevLng })
+                : d;
+            const etaMin = Math.max(1, Math.round((d / 1000) / BUS_SPEED_KMH * 60));
+            return {
+                id: bus.id,
+                label: bus.label,
+                lineId: bus.lineId,
+                lineName: line ? line.name : "?",
+                direction: bus.direction || (bus.dir > 0 ? "ذهاب" : "إياب"),
+                lat: bus.lat,
+                lng: bus.lng,
+                distanceMeters: Math.round(d),
+                etaMin,
+                approaching: dPrev > d + 2 // se rapproche (marge anti-bruit)
+            };
+        })
+        .filter((b) => b.distanceMeters <= radiusKm * 1000)
+        .sort((a, b) => a.distanceMeters - b.distanceMeters);
+
+    res.json({ me, buses });
+});
+
+// Position envoyee par un vrai chauffeur (GPS du bus). Passe le bus en mode "manuel".
+router.post("/bus/:id/position", requireAuth("transporteur"), (req, res) => {
+    const bus = data.buses.find((b) => b.id === req.params.id);
+    if (!bus) return res.status(404).json({ error: "Bus introuvable." });
+    const line = data.lines.find((l) => l.id === bus.lineId);
+    if (!line || line.ownerId !== req.user.id) return res.status(403).json({ error: "Ce bus ne vous appartient pas." });
+    const { lat, lng, direction } = req.body || {};
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return res.status(400).json({ error: "lat/lng invalides." });
+    bus.prevLat = bus.lat; bus.prevLng = bus.lng;
+    bus.lat = lat; bus.lng = lng;
+    if (direction) bus.direction = direction;
+    bus.manual = true;
+    bus.updatedAt = new Date().toISOString();
+    res.json({ bus });
+});
+
+// Un transporteur ajoute un bus a l'une de ses lignes.
+router.post("/buses", requireAuth("transporteur"), (req, res) => {
+    const { lineId, label } = req.body || {};
+    const line = data.lines.find((l) => l.id === lineId && l.ownerId === req.user.id);
+    if (!line) return res.status(404).json({ error: "Ligne introuvable." });
+    const bus = {
+        id: newId("bus"), lineId, label: label || "باص",
+        t: 0, dir: 1, lat: null, lng: null, prevLat: null, prevLng: null,
+        manual: false, direction: "ذهاب", updatedAt: new Date().toISOString()
+    };
+    data.buses.push(bus);
+    save();
+    res.json({ bus });
 });
 
 module.exports = router;
