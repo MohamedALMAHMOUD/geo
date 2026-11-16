@@ -50,6 +50,32 @@
                 <div id="busMsg" class="msg"></div>
             </div>
 
+            <!-- بحث عن خط (من/إلى) -->
+            <div class="card">
+                <h2>🔎 ابحث عن خط (من / إلى)</h2>
+                <label>من (نقطة الانطلاق)</label>
+                <div class="row">
+                    <input id="fromText" placeholder="مثال: المزة" style="flex:3" />
+                    <button id="fromBtn" class="secondary" style="flex:1;margin-top:0">بحث</button>
+                </div>
+                <div id="fromCands"></div>
+                <label>إلى (الوجهة)</label>
+                <div class="row">
+                    <input id="toText" placeholder="مثال: باب توما" style="flex:3" />
+                    <button id="toBtn" class="secondary" style="flex:1;margin-top:0">بحث</button>
+                </div>
+                <div id="toCands"></div>
+                <button id="searchBtn">ابحث عن الخطوط</button>
+                <div id="searchMsg" class="msg"></div>
+                <div id="routes"></div>
+            </div>
+
+            <!-- المفضّلة -->
+            <div class="card">
+                <h2>⭐ خطوطي المفضّلة</h2>
+                <div id="favs" class="muted">—</div>
+            </div>
+
             <div class="card">
                 <h2>رصيدي</h2>
                 <div class="balance"><span id="balance">0</span> <small>كريدت (ل.س جديدة)</small></div>

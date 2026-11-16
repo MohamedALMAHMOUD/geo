@@ -83,6 +83,7 @@ async function refresh() {
         ...recharges.map((r) => ({ t: r.createdAt, txt: `شحن ${r.amountCredits} كريدت`, status: r.status })),
         ...trips.map((t) => ({ t: t.createdAt, txt: `رحلة ‑${t.priceCredits} كريدت`, status: "confirmed" }))
     ].sort((a, b) => b.t.localeCompare(a.t)).slice(0, 15);
+    loadFavorites();
     $("history").innerHTML = items.length
         ? "<table><tr><th>التاريخ</th><th>العملية</th><th>الحالة</th></tr>" +
           items.map((i) => `<tr><td>${new Date(i.t).toLocaleString("ar")}</td><td>${i.txt}</td><td><span class="pill ${i.status}">${STATUS_AR[i.status] || i.status}</span></td></tr>`).join("") +
@@ -191,6 +192,81 @@ function renderBuses(buses) {
             <div class="meta"><b>${b.distanceMeters} م</b><br><span class="muted">~${b.etaMin} دقيقة</span></div>
         </div>`;
     }).join("");
+}
+
+// ========================================================================
+//  البحث عن خط (من / إلى) + المفضّلة
+// ========================================================================
+let fromPlace = null, toPlace = null;
+
+async function geocodeField(text, setPlace, candsEl) {
+    candsEl.innerHTML = "";
+    if (!text.trim()) return;
+    try {
+        const { results } = await api("/geocode?q=" + encodeURIComponent(text.trim()));
+        if (!results.length) { candsEl.innerHTML = "<span class='muted'>لا يوجد مكان مطابق.</span>"; return; }
+        if (results.length === 1) { setPlace(results[0]); candsEl.innerHTML = `<span style="color:var(--accent)">✓ ${results[0].name}</span>`; return; }
+        candsEl.innerHTML = results.map((r, i) => `<button class="ghost" style="margin:4px 4px 0 0;padding:6px 10px" data-i="${i}">📍 ${r.name}</button>`).join("");
+        candsEl.querySelectorAll("button").forEach((b) => b.onclick = () => {
+            const r = results[b.dataset.i];
+            setPlace(r); candsEl.innerHTML = `<span style="color:var(--accent)">✓ ${r.name}</span>`;
+        });
+    } catch (e) { candsEl.innerHTML = `<span class='muted'>${e.message}</span>`; }
+}
+
+$("fromBtn").onclick = () => geocodeField($("fromText").value, (p) => fromPlace = p, $("fromCands"));
+$("toBtn").onclick = () => geocodeField($("toText").value, (p) => toPlace = p, $("toCands"));
+
+$("searchBtn").onclick = async () => {
+    clearMsg($("searchMsg"));
+    if (!fromPlace || !toPlace) { msg($("searchMsg"), "اختر نقطة الانطلاق والوجهة أولًا (اضغط «بحث» بجانب كل حقل).", false); return; }
+    try {
+        const { routes } = await api("/search-routes", { method: "POST", body: { from: fromPlace, to: toPlace } });
+        if (!routes.length) { $("routes").innerHTML = "<p class='muted'>لا يوجد خط مباشر بين هذين المكانين. جرّب نقطة أقرب.</p>"; return; }
+        $("routes").innerHTML = routes.map((r) => {
+            const back = r.direction === "إياب";
+            return `<div class="instr" style="margin-top:10px">
+                <div style="display:flex;justify-content:space-between;align-items:center">
+                    <b>${r.lineName}</b>
+                    <span style="cursor:pointer;font-size:20px" data-fav="${r.lineId}">${r.isFavorite ? "⭐" : "☆"}</span>
+                </div>
+                <div style="margin:6px 0">
+                    <span class="tag-dir ${back ? "back" : "go"}">${r.direction}</span>
+                    <span class="muted">${r.priceCredits} كريدت • ~${r.rideMin} دقيقة</span>
+                </div>
+                🚏 اركب من: <b>${r.board.name}</b> (مشي ${r.walkFromMeters} م)<br>
+                🏁 انزل في: <b>${r.alight.name}</b> (مشي ${r.walkToMeters} م)<br>
+                <span class="muted">عدد المحطات بينهما: ${r.stopsBetween}</span>
+            </div>`;
+        }).join("");
+        $("routes").querySelectorAll("[data-fav]").forEach((el) => el.onclick = async () => {
+            const id = el.dataset.fav, isFav = el.textContent.trim() === "⭐";
+            try {
+                if (isFav) await api("/favorites/" + id, { method: "DELETE" });
+                else await api("/favorites", { method: "POST", body: { lineId: id } });
+                el.textContent = isFav ? "☆" : "⭐";
+                loadFavorites();
+            } catch (e) { alert(e.message); }
+        });
+    } catch (e) { msg($("searchMsg"), e.message, false); }
+};
+
+async function loadFavorites() {
+    try {
+        const { favorites } = await api("/favorites");
+        $("favs").innerHTML = favorites.length
+            ? favorites.map((f) => `<div class="bus-item">
+                <div style="flex:1">
+                    <b>${f.name}</b><br>
+                    <span class="muted">${(f.stops || []).map((s) => s.name).join(" ← ")}</span>
+                </div>
+                <button class="danger" style="margin:0;padding:6px 10px" data-del="${f.id}">إزالة</button>
+            </div>`).join("")
+            : "<span class='muted'>لا توجد خطوط مفضّلة بعد. أضف خطًا بالنجمة من نتائج البحث.</span>";
+        $("favs").querySelectorAll("[data-del]").forEach((b) => b.onclick = async () => {
+            try { await api("/favorites/" + b.dataset.del, { method: "DELETE" }); loadFavorites(); } catch (e) { alert(e.message); }
+        });
+    } catch { /* non connecté */ }
 }
 
 // ---------- الشحن ----------
