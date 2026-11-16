@@ -43,6 +43,20 @@
             </div>
 
             <div class="card">
+                <h2>🎫 قارئ التذاكر (QR)</h2>
+                <p class="muted">امسح رمز QR للراكب بالكاميرا، أو أدخل الرمز يدويًا، لخصم الأجرة من رصيده.</p>
+                <div id="reader" style="width:100%;max-width:320px;margin:0 auto;border-radius:12px;overflow:hidden"></div>
+                <div class="row" style="margin-top:10px">
+                    <button id="scanBtn" class="secondary" style="flex:1">📷 تشغيل الكاميرا</button>
+                    <button id="scanStop" class="ghost" style="flex:1">إيقاف</button>
+                </div>
+                <label>أو أدخل الرمز يدويًا</label>
+                <input id="codeInput" placeholder="BUSQR:..." style="direction:ltr" />
+                <button id="validateBtn">تحقّق من التذكرة</button>
+                <div id="validateResult"></div>
+            </div>
+
+            <div class="card">
                 <h2>باصاتي ومواقعها</h2>
                 <div id="buses" class="muted">—</div>
             </div>
@@ -75,6 +89,7 @@
         </div>
     </div>
 
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
     <script src="transporteur.js"></script>
 </body>
 </html>

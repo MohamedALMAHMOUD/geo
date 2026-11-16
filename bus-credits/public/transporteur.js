@@ -100,6 +100,37 @@ async function refresh() {
         : "<span class='muted'>لا توجد تحويلات.</span>";
 }
 
+// ---------- قارئ التذاكر (QR) ----------
+async function doValidate(code) {
+    const box = $("validateResult");
+    box.innerHTML = "<span class='muted'>جارٍ التحقق…</span>";
+    try {
+        const r = await api("/ticket/validate", { method: "POST", body: { code } });
+        box.innerHTML = `<div class="msg show ok">✅ تذكرة صالحة — ${r.riderName}<br>${r.lineName} • خُصم ${r.priceCredits} كريدت • رصيد الراكب: ${r.riderBalance}</div>`;
+        refresh();
+    } catch (e) {
+        box.innerHTML = `<div class="msg show err">❌ ${e.message}</div>`;
+    }
+}
+
+$("validateBtn").onclick = () => {
+    const c = $("codeInput").value.trim();
+    if (c) doValidate(c);
+};
+
+let qrScanner = null;
+$("scanBtn").onclick = async () => {
+    if (typeof Html5Qrcode === "undefined") { $("validateResult").innerHTML = "<div class='msg show err'>تعذّر تحميل قارئ الكاميرا (تحقّق من الاتصال). استخدم الإدخال اليدوي.</div>"; return; }
+    try {
+        qrScanner = new Html5Qrcode("reader");
+        await qrScanner.start({ facingMode: "environment" }, { fps: 10, qrbox: 220 },
+            (decoded) => { doValidate(decoded); stopScan(); },
+            () => {});
+    } catch (e) { $("validateResult").innerHTML = "<div class='msg show err'>تعذّر فتح الكاميرا. استخدم الإدخال اليدوي.</div>"; }
+};
+function stopScan() { if (qrScanner) { qrScanner.stop().then(() => qrScanner.clear()).catch(() => {}); qrScanner = null; } }
+$("scanStop").onclick = stopScan;
+
 window.confirmR = async (id) => { try { await api(`/transporteur/recharge/${id}/confirm`, { method: "POST" }); await refresh(); } catch (e) { alert(e.message); } };
 window.rejectR = async (id) => { try { await api(`/transporteur/recharge/${id}/reject`, { method: "POST" }); await refresh(); } catch (e) { alert(e.message); } };
 

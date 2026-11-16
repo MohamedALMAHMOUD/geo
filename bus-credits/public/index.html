@@ -50,9 +50,9 @@
                 <div id="busMsg" class="msg"></div>
             </div>
 
-            <!-- بحث عن خط (من/إلى) -->
+            <!-- تخطيط رحلة (من/إلى) مع التبديل -->
             <div class="card">
-                <h2>🔎 ابحث عن خط (من / إلى)</h2>
+                <h2>🧭 خطّط رحلتك (مع التبديل)</h2>
                 <label>من (نقطة الانطلاق)</label>
                 <div class="row">
                     <input id="fromText" placeholder="مثال: المزة" style="flex:3" />
@@ -65,9 +65,24 @@
                     <button id="toBtn" class="secondary" style="flex:1;margin-top:0">بحث</button>
                 </div>
                 <div id="toCands"></div>
-                <button id="searchBtn">ابحث عن الخطوط</button>
+                <button id="searchBtn">خطّط الرحلة</button>
                 <div id="searchMsg" class="msg"></div>
                 <div id="routes"></div>
+            </div>
+
+            <!-- تذكرة QR -->
+            <div class="card">
+                <h2>🎫 تذكرتي (QR)</h2>
+                <p class="muted">أنشئ تذكرة واعرض رمز QR للسائق أو مرّره أمام جهاز التدقيق لخصم الأجرة.</p>
+                <label>الخط</label>
+                <select id="ticketLine"></select>
+                <button id="genTicket">إنشاء تذكرة QR</button>
+                <div id="ticketBox" class="hidden" style="text-align:center">
+                    <div id="qr" style="display:inline-block;background:#fff;padding:12px;border-radius:12px;margin-top:12px"></div>
+                    <div id="ticketCode" class="muted" style="margin-top:8px;direction:ltr"></div>
+                    <div id="ticketStatus" style="margin-top:8px;font-weight:700"></div>
+                </div>
+                <div id="ticketMsg" class="msg"></div>
             </div>
 
             <!-- المفضّلة -->
@@ -109,6 +124,7 @@
     </div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <script src="client.js"></script>
 </body>
 </html>

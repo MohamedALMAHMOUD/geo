@@ -5,6 +5,7 @@ const { hashPin, verifyPin, createSession, requireAuth } = require("./auth");
 const chamcash = require("./chamcash");
 const { distanceMeters } = require("./geo");
 const { searchPlaces } = require("./places");
+const { planJourney } = require("./router");
 
 const BUS_SPEED_KMH = 20; // vitesse moyenne supposee pour estimer le temps d'arrivee
 
@@ -450,6 +451,80 @@ router.post("/search-routes", (req, res) => {
 
     results.sort((x, y) => (x.walkFromMeters + x.walkToMeters) - (y.walkFromMeters + y.walkToMeters) || x.rideMin - y.rideMin);
     res.json({ from, to, count: results.length, routes: results });
+});
+
+// =========================================================================
+//  PLANIFICATEUR D'ITINERAIRE AVEC CORRESPONDANCES (كالـ TAN)
+// =========================================================================
+router.post("/plan", (req, res) => {
+    const { from, to } = req.body || {};
+    if (!from || !to || !Number.isFinite(from.lat) || !Number.isFinite(to.lat)) {
+        return res.status(400).json({ error: "from et to (lat/lng) requis." });
+    }
+    const itineraries = planJourney(from, to, {});
+    res.json({ from, to, itineraries });
+});
+
+// =========================================================================
+//  TICKETS / QR (recharger un trajet et le montrer au conducteur / valideur)
+// =========================================================================
+// Le client genere un ticket -> un code QR a presenter. Le valideur (transporteur)
+// le scanne -> le trajet est debite du solde du client.
+router.post("/ticket/create", requireAuth("client"), (req, res) => {
+    const { lineId } = req.body || {};
+    const line = lineId ? data.lines.find((l) => l.id === lineId) : null;
+    const price = line ? line.priceCredits : 35;
+    const w = data.wallets.find((x) => x.userId === req.user.id) || { balanceCredits: 0 };
+    if (w.balanceCredits < price) {
+        return res.status(402).json({ error: "رصيد غير كافٍ لإنشاء التذكرة.", balanceCredits: w.balanceCredits, priceCredits: price });
+    }
+    const ticket = {
+        id: newId("tk"),
+        userId: req.user.id,
+        lineId: line ? line.id : null,
+        lineName: line ? line.name : "أي خط",
+        priceCredits: price,
+        status: "active",
+        createdAt: new Date().toISOString(),
+        exp: Date.now() + 15 * 60 * 1000, // صالحة 15 دقيقة
+        usedAt: null,
+        validatedBy: null
+    };
+    data.tickets.push(ticket);
+    save();
+    res.json({ ticket, qrPayload: "BUSQR:" + ticket.id });
+});
+
+// Etat d'un ticket (pour l'app client : savoir s'il a ete valide)
+router.get("/ticket/:id", requireAuth("client"), (req, res) => {
+    const t = data.tickets.find((x) => x.id === req.params.id && x.userId === req.user.id);
+    if (!t) return res.status(404).json({ error: "التذكرة غير موجودة." });
+    if (t.status === "active" && t.exp < Date.now()) { t.status = "expired"; save(); }
+    res.json({ ticket: t });
+});
+
+// Validation par le conducteur / l'appareil (transporteur).
+router.post("/ticket/validate", requireAuth("transporteur"), (req, res) => {
+    let code = (req.body && req.body.code) || "";
+    code = String(code).trim().replace(/^BUSQR:/i, "");
+    const t = data.tickets.find((x) => x.id === code);
+    if (!t) return res.status(404).json({ error: "تذكرة غير معروفة." });
+    if (t.status === "used") return res.status(409).json({ error: "التذكرة مستخدمة مسبقًا.", usedAt: t.usedAt });
+    if (t.status === "expired" || t.exp < Date.now()) { t.status = "expired"; save(); return res.status(410).json({ error: "التذكرة منتهية الصلاحية." }); }
+
+    const w = data.wallets.find((x) => x.userId === t.userId);
+    if (!w || w.balanceCredits < t.priceCredits) {
+        return res.status(402).json({ error: "رصيد الراكب غير كافٍ." });
+    }
+    w.balanceCredits -= t.priceCredits;
+    t.status = "used";
+    t.usedAt = new Date().toISOString();
+    t.validatedBy = req.user.id;
+    // enregistrer comme trajet (pour les stats du transporteur)
+    if (t.lineId) data.trips.push({ id: newId("trip"), clientId: t.userId, lineId: t.lineId, priceCredits: t.priceCredits, createdAt: t.usedAt });
+    save();
+    const rider = data.users.find((u) => u.id === t.userId);
+    res.json({ ok: true, riderName: rider ? rider.name : "راكب", lineName: t.lineName, priceCredits: t.priceCredits, riderBalance: w.balanceCredits });
 });
 
 // =========================================================================

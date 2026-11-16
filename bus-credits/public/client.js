@@ -73,6 +73,7 @@ async function loadLines() {
     const opts = lines.map((l) => `<option value="${l.id}" data-price="${l.priceCredits}">${l.name} — ${l.priceCredits} كريدت</option>`).join("");
     $("lineSelect").innerHTML = opts;
     $("tripLineSelect").innerHTML = opts;
+    if ($("ticketLine")) $("ticketLine").innerHTML = opts;
 }
 
 async function refresh() {
@@ -198,6 +199,7 @@ function renderBuses(buses) {
 //  البحث عن خط (من / إلى) + المفضّلة
 // ========================================================================
 let fromPlace = null, toPlace = null;
+let favIds = new Set();
 
 async function geocodeField(text, setPlace, candsEl) {
     candsEl.innerHTML = "";
@@ -221,24 +223,30 @@ $("searchBtn").onclick = async () => {
     clearMsg($("searchMsg"));
     if (!fromPlace || !toPlace) { msg($("searchMsg"), "اختر نقطة الانطلاق والوجهة أولًا (اضغط «بحث» بجانب كل حقل).", false); return; }
     try {
-        const { routes } = await api("/search-routes", { method: "POST", body: { from: fromPlace, to: toPlace } });
-        if (!routes.length) { $("routes").innerHTML = "<p class='muted'>لا يوجد خط مباشر بين هذين المكانين. جرّب نقطة أقرب.</p>"; return; }
-        $("routes").innerHTML = routes.map((r) => {
-            const back = r.direction === "إياب";
-            return `<div class="instr" style="margin-top:10px">
+        const { itineraries } = await api("/plan", { method: "POST", body: { from: fromPlace, to: toPlace } });
+        if (!itineraries.length) { $("routes").innerHTML = "<p class='muted'>لا يوجد مسار بين هذين المكانين عبر الشبكة الحالية.</p>"; return; }
+        const it = itineraries[0];
+        const legsHtml = it.legs.map((l) => {
+            if (l.type === "walk") return `<div style="padding:6px 0">🚶 مشي: <b>${l.fromName}</b> ← <b>${l.toName}</b> <span class="muted">(~${l.min} د)</span></div>`;
+            if (l.type === "transfer") return `<div style="padding:6px 0;color:#f59e0b">🔁 تبديل في <b>${l.atName}</b> <span class="muted">(~${l.min} د انتظار)</span></div>`;
+            const back = l.direction === "إياب";
+            const star = favIds.has(l.lineId) ? "⭐" : "☆";
+            return `<div style="padding:8px 0;border-top:1px solid #2a3850">
                 <div style="display:flex;justify-content:space-between;align-items:center">
-                    <b>${r.lineName}</b>
-                    <span style="cursor:pointer;font-size:20px" data-fav="${r.lineId}">${r.isFavorite ? "⭐" : "☆"}</span>
+                    <b>🚌 ${l.lineName}</b>
+                    <span style="cursor:pointer;font-size:20px" data-fav="${l.lineId}">${star}</span>
                 </div>
-                <div style="margin:6px 0">
-                    <span class="tag-dir ${back ? "back" : "go"}">${r.direction}</span>
-                    <span class="muted">${r.priceCredits} كريدت • ~${r.rideMin} دقيقة</span>
+                <div style="margin:4px 0">
+                    <span class="tag-dir ${back ? "back" : "go"}">${l.direction}</span>
+                    <span class="muted">${l.min} د • ${l.stops} محطات</span>
                 </div>
-                🚏 اركب من: <b>${r.board.name}</b> (مشي ${r.walkFromMeters} م)<br>
-                🏁 انزل في: <b>${r.alight.name}</b> (مشي ${r.walkToMeters} م)<br>
-                <span class="muted">عدد المحطات بينهما: ${r.stopsBetween}</span>
+                اركب من <b>${l.boardName}</b> وانزل في <b>${l.alightName}</b>
             </div>`;
         }).join("");
+        $("routes").innerHTML = `<div class="instr" style="margin-top:10px">
+            <div style="font-size:16px"><b>⏱️ ~${it.totalMin} دقيقة</b> • 🔁 ${it.transfers} تبديل • 💳 ${it.fareCredits} كريدت</div>
+            <div style="margin-top:8px">${legsHtml}</div>
+        </div>`;
         $("routes").querySelectorAll("[data-fav]").forEach((el) => el.onclick = async () => {
             const id = el.dataset.fav, isFav = el.textContent.trim() === "⭐";
             try {
@@ -251,9 +259,44 @@ $("searchBtn").onclick = async () => {
     } catch (e) { msg($("searchMsg"), e.message, false); }
 };
 
+// ---------- تذكرة QR ----------
+let ticketPoll = null;
+$("genTicket").onclick = async () => {
+    clearMsg($("ticketMsg"));
+    try {
+        const { ticket, qrPayload } = await api("/ticket/create", { method: "POST", body: { lineId: $("ticketLine").value } });
+        show($("ticketBox"), true);
+        $("qr").innerHTML = "";
+        if (typeof QRCode !== "undefined") {
+            new QRCode($("qr"), { text: qrPayload, width: 180, height: 180 });
+        } else {
+            $("qr").innerHTML = `<div style="color:#000;font-weight:700;padding:20px">${qrPayload}</div>`;
+        }
+        $("ticketCode").textContent = qrPayload;
+        $("ticketStatus").textContent = "⏳ بانتظار التدقيق… اعرض الرمز للسائق";
+        $("ticketStatus").style.color = "#f59e0b";
+        if (ticketPoll) clearInterval(ticketPoll);
+        ticketPoll = setInterval(async () => {
+            try {
+                const { ticket: t } = await api("/ticket/" + ticket.id);
+                if (t.status === "used") {
+                    $("ticketStatus").textContent = "✅ تم التحقق وخُصمت الأجرة";
+                    $("ticketStatus").style.color = "#22c55e";
+                    clearInterval(ticketPoll); refresh();
+                } else if (t.status === "expired") {
+                    $("ticketStatus").textContent = "⌛ انتهت صلاحية التذكرة";
+                    $("ticketStatus").style.color = "#ef4444";
+                    clearInterval(ticketPoll);
+                }
+            } catch { clearInterval(ticketPoll); }
+        }, 3000);
+    } catch (e) { msg($("ticketMsg"), e.message, false); }
+};
+
 async function loadFavorites() {
     try {
         const { favorites } = await api("/favorites");
+        favIds = new Set(favorites.map((f) => f.id));
         $("favs").innerHTML = favorites.length
             ? favorites.map((f) => `<div class="bus-item">
                 <div style="flex:1">
