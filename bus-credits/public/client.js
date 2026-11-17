@@ -83,7 +83,6 @@ async function loadLines() {
     const { lines } = await api("/lines");
     linesCache = lines;
     const opts = lines.map((l) => `<option value="${l.id}" data-price="${l.priceCredits}">${l.name} — ${l.priceCredits} كريدت</option>`).join("");
-    $("lineSelect").innerHTML = opts;
     $("tripLineSelect").innerHTML = opts;
     if ($("ticketLine")) $("ticketLine").innerHTML = opts;
 }
@@ -296,9 +295,9 @@ $("genTicket").onclick = async () => {
                     $("ticketStatus").style.color = "#22c55e";
                     clearInterval(ticketPoll); refresh();
                 } else if (t.status === "expired") {
-                    $("ticketStatus").textContent = "⌛ انتهت صلاحية التذكرة";
-                    $("ticketStatus").style.color = "#ef4444";
-                    clearInterval(ticketPoll);
+                    $("ticketStatus").textContent = "⌛ انتهت الصلاحية — تم إرجاع الرصيد إلى محفظتك";
+                    $("ticketStatus").style.color = "#f59e0b";
+                    clearInterval(ticketPoll); refresh();
                 }
             } catch { clearInterval(ticketPoll); }
         }, 3000);
@@ -328,7 +327,7 @@ async function loadFavorites() {
 $("rechargeBtn").onclick = async () => {
     clearMsg($("rechargeMsg"));
     try {
-        const data = await api("/recharge", { method: "POST", body: { lineId: $("lineSelect").value, amountCredits: Number($("amount").value) } });
+        const data = await api("/recharge", { method: "POST", body: { amountCredits: Number($("amount").value) } });
         currentRecharge = data.recharge;
         const i = data.instructions;
         $("rechargeInstr").innerHTML = `

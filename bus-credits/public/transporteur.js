@@ -70,9 +70,22 @@ async function boot() {
 
 async function refresh() {
     const d = await api("/transporteur/overview");
-    $("sPending").textContent = d.stats.pending;
-    $("sRevenue").textContent = d.stats.revenueCredits;
-    $("sTrips").textContent = d.stats.tripsCount;
+    const st = d.stats;
+    $("sTrips").textContent = st.validatedTrips;
+    $("sOwed").textContent = st.owedNetCredits;
+    $("sCommission").textContent = st.commissionCredits;
+
+    $("settlement").innerHTML = `<table>
+        <tr><th>إجمالي الرحلات المُصدّقة</th><td>${st.validatedTrips}</td></tr>
+        <tr><th>المبلغ الإجمالي</th><td>${st.owedGrossCredits} كريدت</td></tr>
+        <tr><th>عمولة المنصّة (${st.commissionPct}%)</th><td>‑${st.commissionCredits} كريدت</td></tr>
+        <tr><th><b>المستحق لك (صافي)</b></th><td><b>${st.owedNetCredits} كريدت</b></td></tr>
+    </table>`;
+
+    $("validations").innerHTML = (d.recentValidations && d.recentValidations.length)
+        ? "<table><tr><th>الراكب</th><th>الخط</th><th>الأجرة</th><th>الوقت</th></tr>" +
+          d.recentValidations.map((t) => `<tr><td>${t.clientName}</td><td>${t.lineName}</td><td>${t.priceCredits} كريدت</td><td class="muted">${new Date(t.createdAt).toLocaleString("ar")}</td></tr>`).join("") + "</table>"
+        : "<span class='muted'>لا توجد رحلات مُصدّقة بعد.</span>";
 
     $("buses").innerHTML = (d.buses && d.buses.length)
         ? "<table><tr><th>الباص</th><th>الخط</th><th>الاتجاه</th><th>الموقع</th></tr>" +
@@ -86,28 +99,9 @@ async function refresh() {
         : "<span class='muted'>لا توجد باصات.</span>";
 
     $("lines").innerHTML = d.lines.length
-        ? "<table><tr><th>الخط</th><th>السعر</th><th>شام كاش</th></tr>" +
-          d.lines.map((l) => `<tr><td>${l.name}</td><td>${l.priceCredits} كريدت</td><td style="direction:ltr"><code>${l.chamcashAccount}</code></td></tr>`).join("") + "</table>"
+        ? "<table><tr><th>الخط</th><th>السعر</th></tr>" +
+          d.lines.map((l) => `<tr><td>${l.name}</td><td>${l.priceCredits} كريدت</td></tr>`).join("") + "</table>"
         : "<span class='muted'>لا توجد خطوط.</span>";
-
-    $("recharges").innerHTML = d.recharges.length
-        ? "<table><tr><th>الزبون</th><th>الخط</th><th>المبلغ</th><th>المرجع</th><th>الحالة</th><th></th></tr>" +
-          d.recharges.map((r) => `<tr>
-              <td>${r.clientName}<br><span class="muted" style="direction:ltr">${r.clientPhone}</span></td>
-              <td>${r.lineName}</td>
-              <td>${r.amountCredits} كريدت</td>
-              <td style="direction:ltr"><code>${r.reference}</code></td>
-              <td><span class="pill ${r.status}">${STATUS_AR[r.status] || r.status}</span></td>
-              <td>${r.status === "pending"
-                  ? `<button class="secondary" style="padding:6px 10px;margin:0" onclick="confirmR('${r.id}')">تأكيد</button>
-                     <button class="danger" style="padding:6px 10px;margin:4px 0 0" onclick="rejectR('${r.id}')">رفض</button>`
-                  : "—"}</td></tr>`).join("") + "</table>"
-        : "<span class='muted'>لا توجد طلبات.</span>";
-
-    $("ledger").innerHTML = d.ledger.length
-        ? "<table><tr><th>الحساب</th><th>المبلغ</th><th>المرجع</th><th>الحالة</th></tr>" +
-          d.ledger.map((t) => `<tr><td style="direction:ltr"><code>${t.account}</code></td><td>${t.amountCredits}</td><td style="direction:ltr"><code>${t.reference}</code></td><td>${t.consumed ? "مُستخدَم" : "متاح"}</td></tr>`).join("") + "</table>"
-        : "<span class='muted'>لا توجد تحويلات.</span>";
 }
 
 // ---------- قارئ التذاكر (QR) ----------

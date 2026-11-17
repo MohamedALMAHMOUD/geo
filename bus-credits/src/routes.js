@@ -6,10 +6,27 @@ const chamcash = require("./chamcash");
 const { distanceMeters } = require("./geo");
 const { searchPlaces } = require("./places");
 const { planJourney } = require("./router");
+const { PLATFORM_CHAMCASH, TICKET_TTL_MIN, COMMISSION_PCT } = require("./config");
+const ticketsign = require("./ticketsign");
 
 const BUS_SPEED_KMH = 20; // vitesse moyenne supposee pour estimer le temps d'arrivee
 
 const router = express.Router();
+
+// Les tickets QR sont PRE-PAYES : le solde est debite a la creation.
+// Si un ticket expire sans etre valide -> on rembourse automatiquement le solde.
+function expireTickets() {
+    let changed = false;
+    for (const t of data.tickets) {
+        if (t.status === "active" && t.exp < Date.now()) {
+            t.status = "expired";
+            const w = data.wallets.find((x) => x.userId === t.userId);
+            if (w) { w.balanceCredits += t.priceCredits; t.refunded = true; } // remboursement
+            changed = true;
+        }
+    }
+    if (changed) save();
+}
 
 // ---------- Helpers ----------
 function walletOf(userId) {
@@ -140,9 +157,7 @@ router.get("/history", requireAuth("client"), (req, res) => {
 // 1) Le client demande une recharge -> on cree une demande "pending"
 //    et on lui donne les instructions de paiement ChamCash.
 router.post("/recharge", requireAuth("client"), (req, res) => {
-    const { lineId, amountCredits } = req.body || {};
-    const line = data.lines.find((l) => l.id === lineId);
-    if (!line) return res.status(404).json({ error: "Ligne introuvable." });
+    const { amountCredits } = req.body || {};
     const amount = Number(amountCredits);
     if (!(amount > 0)) return res.status(400).json({ error: "Montant invalide." });
 
@@ -150,7 +165,7 @@ router.post("/recharge", requireAuth("client"), (req, res) => {
     const recharge = {
         id: newId("rc"),
         clientId: req.user.id,
-        lineId: line.id,
+        lineId: null,                 // la recharge alimente le PORTEFEUILLE (pas une ligne)
         amountCredits: amount,
         reference,
         status: "pending",
@@ -161,13 +176,14 @@ router.post("/recharge", requireAuth("client"), (req, res) => {
     data.recharges.push(recharge);
     save();
 
+    // Le client paie NOTRE compte plateforme (que nous controlons).
     res.json({
         recharge,
         instructions: {
-            chamcashAccount: line.chamcashAccount,
+            chamcashAccount: PLATFORM_CHAMCASH,
             amountCredits: amount,
             reference,
-            message: `Envoyez ${amount} L.S. (nouvelles) vers le compte ChamCash ${line.chamcashAccount} en indiquant la reference ${reference}.`
+            message: `أرسل ${amount} ل.س (جديدة) إلى حساب شام كاش ${PLATFORM_CHAMCASH} مع الرقم المرجعي ${reference}.`
         }
     });
 });
@@ -177,13 +193,12 @@ router.post("/recharge", requireAuth("client"), (req, res) => {
 router.post("/recharge/:id/simulate-transfer", requireAuth("client"), (req, res) => {
     const rc = data.recharges.find((r) => r.id === req.params.id && r.clientId === req.user.id);
     if (!rc) return res.status(404).json({ error: "Demande introuvable." });
-    const line = data.lines.find((l) => l.id === rc.lineId);
     chamcash.simulateIncomingTransfer({
-        account: line.chamcashAccount,
+        account: PLATFORM_CHAMCASH,
         amountCredits: rc.amountCredits,
         reference: rc.reference
     });
-    res.json({ ok: true, message: "Transfert simule injecte dans ChamCash. Vous pouvez maintenant verifier." });
+    res.json({ ok: true, message: "Transfert simule injecte. Vous pouvez maintenant verifier." });
 });
 
 // 3) Verification : on interroge ChamCash. Si le transfert est trouve ->
@@ -193,9 +208,9 @@ router.post("/recharge/:id/verify", requireAuth("client"), async (req, res) => {
     if (!rc) return res.status(404).json({ error: "Demande introuvable." });
     if (rc.status === "confirmed") return res.json({ recharge: rc, alreadyConfirmed: true });
 
-    const line = data.lines.find((l) => l.id === rc.lineId);
+    // Verification sur NOTRE compte via NOTRE acces API ShamCash (ici simule).
     const result = await chamcash.verifyTransfer({
-        account: line.chamcashAccount,
+        account: PLATFORM_CHAMCASH,
         amountCredits: rc.amountCredits,
         reference: rc.reference
     });
@@ -244,23 +259,20 @@ router.get("/transporteur/overview", requireAuth("transporteur"), (req, res) => 
     const myLines = data.lines.filter((l) => l.ownerId === req.user.id);
     const myLineIds = new Set(myLines.map((l) => l.id));
 
-    const recharges = data.recharges
-        .filter((r) => myLineIds.has(r.lineId))
-        .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
-        .map((r) => {
-            const client = data.users.find((u) => u.id === r.clientId);
-            const line = myLines.find((l) => l.id === r.lineId);
-            return { ...r, clientName: client ? client.name : "?", clientPhone: client ? client.phone : "?", lineName: line ? line.name : "?" };
-        });
+    // Trajets VALIDES (QR scannes) sur mes lignes = base du reglement.
+    const trips = data.trips
+        .filter((t) => myLineIds.has(t.lineId))
+        .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 
-    const trips = data.trips.filter((t) => myLineIds.has(t.lineId));
+    const owedGross = trips.reduce((s, t) => s + t.priceCredits, 0);
+    const commission = Math.round(owedGross * COMMISSION_PCT / 100);
+    const owedNet = owedGross - commission;
 
-    const confirmed = recharges.filter((r) => r.status === "confirmed");
-    const revenueCredits = confirmed.reduce((s, r) => s + r.amountCredits, 0);
-    const tripsRevenue = trips.reduce((s, t) => s + t.priceCredits, 0);
-
-    // Ce que ChamCash "voit" arriver sur les comptes du transporteur (simule)
-    const ledger = myLines.flatMap((l) => chamcash.listLedger(l.chamcashAccount));
+    const recentValidations = trips.slice(0, 20).map((t) => {
+        const client = data.users.find((u) => u.id === t.clientId);
+        const line = myLines.find((l) => l.id === t.lineId);
+        return { id: t.id, clientName: client ? client.name : "?", lineName: line ? line.name : "?", priceCredits: t.priceCredits, createdAt: t.createdAt };
+    });
 
     const buses = data.buses
         .filter((b) => myLineIds.has(b.lineId))
@@ -271,16 +283,16 @@ router.get("/transporteur/overview", requireAuth("transporteur"), (req, res) => 
 
     res.json({
         lines: myLines,
-        recharges,
         buses,
+        recentValidations,
         stats: {
-            pending: recharges.filter((r) => r.status === "pending").length,
-            confirmed: confirmed.length,
-            revenueCredits,
-            tripsCount: trips.length,
-            tripsRevenueCredits: tripsRevenue
-        },
-        ledger
+            validatedTrips: trips.length,
+            owedGrossCredits: owedGross,
+            commissionPct: COMMISSION_PCT,
+            commissionCredits: commission,
+            owedNetCredits: owedNet,
+            busesCount: buses.length
+        }
     });
 });
 
@@ -470,61 +482,78 @@ router.post("/plan", (req, res) => {
 // =========================================================================
 // Le client genere un ticket -> un code QR a presenter. Le valideur (transporteur)
 // le scanne -> le trajet est debite du solde du client.
+// Cle publique pour la verification HORS-LIGNE par l'appareil du chauffeur.
+router.get("/ticket/pubkey", (req, res) => {
+    res.json({ algo: "ed25519", publicKey: ticketsign.publicKeyBase64() });
+});
+
+// Creation d'un ticket PRE-PAYE et SIGNE. Le solde est debite tout de suite.
 router.post("/ticket/create", requireAuth("client"), (req, res) => {
+    expireTickets();
     const { lineId } = req.body || {};
-    const line = lineId ? data.lines.find((l) => l.id === lineId) : null;
-    const price = line ? line.priceCredits : 35;
-    const w = data.wallets.find((x) => x.userId === req.user.id) || { balanceCredits: 0 };
+    const line = data.lines.find((l) => l.id === lineId);
+    if (!line) return res.status(404).json({ error: "الخط غير موجود." });
+    const price = line.priceCredits;
+    const w = walletOf(req.user.id);
     if (w.balanceCredits < price) {
         return res.status(402).json({ error: "رصيد غير كافٍ لإنشاء التذكرة.", balanceCredits: w.balanceCredits, priceCredits: price });
     }
+
+    // debiter maintenant (pre-paye) => le QR est un trajet deja paye, valable meme hors-ligne
+    w.balanceCredits -= price;
+    const nonce = newId("n").split("_")[1];
+    const iat = Date.now();
+    const exp = iat + TICKET_TTL_MIN * 60 * 1000;
     const ticket = {
-        id: newId("tk"),
-        userId: req.user.id,
-        lineId: line ? line.id : null,
-        lineName: line ? line.name : "أي خط",
-        priceCredits: price,
-        status: "active",
-        createdAt: new Date().toISOString(),
-        exp: Date.now() + 15 * 60 * 1000, // صالحة 15 دقيقة
-        usedAt: null,
-        validatedBy: null
+        id: newId("tk"), userId: req.user.id, lineId: line.id, lineName: line.name,
+        ownerId: line.ownerId, priceCredits: price, nonce,
+        status: "active", createdAt: new Date().toISOString(), iat, exp,
+        usedAt: null, validatedBy: null, refunded: false
     };
     data.tickets.push(ticket);
     save();
-    res.json({ ticket, qrPayload: "BUSQR:" + ticket.id });
+
+    // QR signe (verifiable hors-ligne avec la cle publique)
+    const qrPayload = ticketsign.sign({ id: ticket.id, u: ticket.userId, l: line.id, p: price, iat, exp, n: nonce });
+    res.json({ ticket, qrPayload, balanceCredits: w.balanceCredits, ttlMin: TICKET_TTL_MIN });
 });
 
-// Etat d'un ticket (pour l'app client : savoir s'il a ete valide)
+// Etat d'un ticket (l'app client sait s'il a ete valide / rembourse).
 router.get("/ticket/:id", requireAuth("client"), (req, res) => {
+    expireTickets();
     const t = data.tickets.find((x) => x.id === req.params.id && x.userId === req.user.id);
     if (!t) return res.status(404).json({ error: "التذكرة غير موجودة." });
-    if (t.status === "active" && t.exp < Date.now()) { t.status = "expired"; save(); }
     res.json({ ticket: t });
 });
 
-// Validation par le conducteur / l'appareil (transporteur).
+// Validation EN LIGNE par le conducteur (transporteur).
+// 1) verifie la SIGNATURE (anti-faux), 2) verifie non-utilise (anti-rejeu),
+// 3) marque "utilise" + credite le reglement de la societe proprietaire.
+// Le solde a deja ete debite a la creation (pre-paye) : rien a debiter ici.
 router.post("/ticket/validate", requireAuth("transporteur"), (req, res) => {
-    let code = (req.body && req.body.code) || "";
-    code = String(code).trim().replace(/^BUSQR:/i, "");
-    const t = data.tickets.find((x) => x.id === code);
+    expireTickets();
+    const code = (req.body && req.body.code) || "";
+    const payload = ticketsign.verify(code);
+    if (!payload) return res.status(400).json({ error: "رمز QR غير صالح (توقيع غير صحيح)." });
+
+    const t = data.tickets.find((x) => x.id === payload.id && x.nonce === payload.n);
     if (!t) return res.status(404).json({ error: "تذكرة غير معروفة." });
     if (t.status === "used") return res.status(409).json({ error: "التذكرة مستخدمة مسبقًا.", usedAt: t.usedAt });
-    if (t.status === "expired" || t.exp < Date.now()) { t.status = "expired"; save(); return res.status(410).json({ error: "التذكرة منتهية الصلاحية." }); }
+    if (t.status === "expired" || t.exp < Date.now()) return res.status(410).json({ error: "التذكرة منتهية الصلاحية." });
 
-    const w = data.wallets.find((x) => x.userId === t.userId);
-    if (!w || w.balanceCredits < t.priceCredits) {
-        return res.status(402).json({ error: "رصيد الراكب غير كافٍ." });
-    }
-    w.balanceCredits -= t.priceCredits;
+    // la societe ne peut valider que SES lignes
+    const line = data.lines.find((l) => l.id === t.lineId);
+    if (!line || line.ownerId !== req.user.id) return res.status(403).json({ error: "هذه التذكرة ليست على أحد خطوطك." });
+
     t.status = "used";
     t.usedAt = new Date().toISOString();
     t.validatedBy = req.user.id;
-    // enregistrer comme trajet (pour les stats du transporteur)
-    if (t.lineId) data.trips.push({ id: newId("trip"), clientId: t.userId, lineId: t.lineId, priceCredits: t.priceCredits, createdAt: t.usedAt });
+    // registre : trajet valide (sert au reglement de la societe + double enregistrement)
+    data.trips.push({ id: newId("trip"), clientId: t.userId, lineId: t.lineId, priceCredits: t.priceCredits, createdAt: t.usedAt, ticketId: t.id });
     save();
+
     const rider = data.users.find((u) => u.id === t.userId);
-    res.json({ ok: true, riderName: rider ? rider.name : "راكب", lineName: t.lineName, priceCredits: t.priceCredits, riderBalance: w.balanceCredits });
+    res.json({ ok: true, riderName: rider ? rider.name : "راكب", lineName: t.lineName, priceCredits: t.priceCredits });
 });
 
 // =========================================================================

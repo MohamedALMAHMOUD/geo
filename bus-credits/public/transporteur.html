@@ -39,9 +39,9 @@
                 <div class="card">
                     <h2>نظرة عامة</h2>
                     <div class="grid3">
-                        <div class="stat"><b id="sPending">0</b><span>طلبات شحن معلّقة</span></div>
-                        <div class="stat"><b id="sRevenue">0</b><span>كريدت مُباع</span></div>
-                        <div class="stat"><b id="sTrips">0</b><span>رحلات</span></div>
+                        <div class="stat"><b id="sTrips">0</b><span>رحلات مُصدّقة</span></div>
+                        <div class="stat"><b id="sOwed">0</b><span>المستحق لك (صافي)</span></div>
+                        <div class="stat"><b id="sCommission">0</b><span>العمولة</span></div>
                     </div>
                 </div>
                 <div class="card">
@@ -77,16 +77,17 @@
                 </div>
             </section>
 
-            <!-- صفحة: الطلبات + تحويلات شام كاش -->
+            <!-- صفحة: المستحقات والرحلات المُصدّقة -->
             <section class="page" id="page-recharges">
                 <div class="card">
-                    <h2>طلبات الشحن الواردة</h2>
-                    <div id="recharges" class="muted">—</div>
+                    <h2>💰 المستحقات والتصفية</h2>
+                    <p class="muted">الركاب يدفعون للمنصّة. تتسلّم المنصّة مستحقّاتك (مجموع الرحلات المُصدّقة ناقص العمولة) إلى حساب شام كاش الخاص بك.</p>
+                    <div id="settlement" class="muted">—</div>
                 </div>
                 <div class="card">
-                    <h2>تحويلات شام كاش (محاكاة)</h2>
-                    <p class="muted">ما «يراه» حساب شام كاش واردًا. في الإنتاج يُستبدل بالـ API الحقيقي لشام كاش.</p>
-                    <div id="ledger" class="muted">—</div>
+                    <h2>الرحلات المُصدّقة (QR)</h2>
+                    <p class="muted">كل رحلة هنا = تذكرة QR صالحة مسحها السائق. هذه قاعدة احتساب مستحقّاتك.</p>
+                    <div id="validations" class="muted">—</div>
                 </div>
             </section>
 
@@ -105,7 +106,7 @@
     <nav id="bottomNav" class="bottom-nav hidden">
         <button data-page="overview" class="active"><span class="ico">📊</span>عام</button>
         <button data-page="tickets"><span class="ico">🎫</span>التذاكر</button>
-        <button data-page="recharges"><span class="ico">📥</span>الطلبات</button>
+        <button data-page="recharges"><span class="ico">💰</span>المستحقات</button>
         <button data-page="buses"><span class="ico">🚌</span>الباصات</button>
     </nav>
 
