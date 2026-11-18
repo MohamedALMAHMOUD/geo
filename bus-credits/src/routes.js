@@ -8,6 +8,10 @@ const { searchPlaces } = require("./places");
 const { planJourney } = require("./router");
 const { PLATFORM_CHAMCASH, TICKET_TTL_MIN, COMMISSION_PCT } = require("./config");
 const ticketsign = require("./ticketsign");
+const tokensign = require("./tokensign");
+
+const TOKEN_FARE = 35;          // prix d'un jeton = 1 trajet
+const TOKEN_MAX_PER_BUY = 20;   // petits carnets : limite la perte si le telephone est perdu
 
 const BUS_SPEED_KMH = 20; // vitesse moyenne supposee pour estimer le temps d'arrivee
 
@@ -554,6 +558,81 @@ router.post("/ticket/validate", requireAuth("transporteur"), (req, res) => {
 
     const rider = data.users.find((u) => u.id === t.userId);
     res.json({ ok: true, riderName: rider ? rider.name : "راكب", lineName: t.lineName, priceCredits: t.priceCredits });
+});
+
+// =========================================================================
+//  JETONS HORS-LIGNE (coffre-fort du telephone + machine sans internet)
+// =========================================================================
+// Cle publique du "tampon officiel" : la machine la telecharge UNE fois (au depot).
+router.get("/tokens/pubkey", (req, res) => {
+    res.json({ algo: "ECDSA-P256", publicKey: tokensign.publicKeyB64() });
+});
+
+// Achat d'un carnet (internet necessaire a ce moment-la seulement).
+// Le telephone envoie les cles PUBLIQUES de ses jetons ; les cles secretes restent dans sa puce.
+router.post("/tokens/buy", requireAuth("client"), (req, res) => {
+    const { publicKeys } = req.body || {};
+    if (!Array.isArray(publicKeys) || publicKeys.length < 1 || publicKeys.length > TOKEN_MAX_PER_BUY) {
+        return res.status(400).json({ error: `Carnet de 1 à ${TOKEN_MAX_PER_BUY} jetons.` });
+    }
+    if (!publicKeys.every(tokensign.isValidP256)) {
+        return res.status(400).json({ error: "Clé de jeton invalide." });
+    }
+    // EN PRODUCTION : verifier ici l'attestation Android de chaque cle
+    // (cle dans la puce, usage unique, vraie app, telephone non roote). Simule dans ce prototype.
+
+    const total = TOKEN_FARE * publicKeys.length;
+    const w = walletOf(req.user.id);
+    if (w.balanceCredits < total) {
+        return res.status(402).json({ error: "Solde insuffisant.", balanceCredits: w.balanceCredits, priceCredits: total });
+    }
+    w.balanceCredits -= total;
+
+    const tokens = publicKeys.map((pk) => {
+        const tid = newId("jt");
+        data.tokens.push({ tid, userId: req.user.id, pub: pk, price: TOKEN_FARE, status: "issued", createdAt: new Date().toISOString(), usedAt: null, machineId: null });
+        return { tid, token: tokensign.signToken({ tid, u: req.user.id, pub: pk, p: TOKEN_FARE, iat: Date.now() }) };
+    });
+    save();
+    res.json({ tokens, balanceCredits: w.balanceCredits });
+});
+
+// Liste des machines (1 machine = 1 bus) pour le simulateur.
+router.get("/sim/machines", (req, res) => {
+    res.json({
+        machines: data.buses.map((b) => {
+            const line = data.lines.find((l) => l.id === b.lineId);
+            return { id: b.id, label: b.label, lineName: line ? line.name : "?" };
+        })
+    });
+});
+
+// Synchronisation d'une machine (quand elle retrouve internet, ex. au depot).
+// Sert UNIQUEMENT a payer les societes. Chaque validation est re-verifiee cryptographiquement :
+// une societe ne peut pas inventer de trajets (il faudrait la signature du telephone du passager).
+router.post("/machine/sync", (req, res) => {
+    const { machineId, records } = req.body || {};
+    const bus = data.buses.find((b) => b.id === machineId);
+    if (!bus) return res.status(404).json({ error: "Machine inconnue." });
+    const line = data.lines.find((l) => l.id === bus.lineId);
+    if (!Array.isArray(records)) return res.status(400).json({ error: "records requis." });
+
+    const results = records.map((r) => {
+        const p = tokensign.verifyToken(r.token);
+        if (!p) return { tid: null, status: "rejected", reason: "tampon officiel invalide" };
+        const msg = tokensign.validationMessage(p.tid, r.challenge, machineId);
+        if (!tokensign.verifyPassenger(p.pub, msg, r.sig)) return { tid: p.tid, status: "rejected", reason: "signature du téléphone invalide" };
+        const t = data.tokens.find((x) => x.tid === p.tid);
+        if (!t) return { tid: p.tid, status: "rejected", reason: "jeton inconnu" };
+        if (t.status === "used") return { tid: p.tid, status: "duplicate" }; // deja compte (re-envoi)
+        t.status = "used";
+        t.usedAt = r.at || new Date().toISOString();
+        t.machineId = machineId;
+        data.trips.push({ id: newId("trip"), clientId: t.userId, lineId: line ? line.id : null, priceCredits: t.price, createdAt: t.usedAt, tokenId: t.tid, busId: bus.id });
+        return { tid: p.tid, status: "accepted" };
+    });
+    save();
+    res.json({ results });
 });
 
 // =========================================================================

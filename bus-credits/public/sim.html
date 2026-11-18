@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="fr" dir="ltr">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Simulateur Jetons</title>
+    <link rel="stylesheet" href="styles.css" />
+    <style>
+        body { direction: ltr; }
+        th, td { text-align: left; }
+        .sim-grid { display: grid; grid-template-columns: 1fr; gap: 16px; }
+        @media (min-width: 900px) { .sim-grid { grid-template-columns: 1fr 1fr; } }
+        .wrap.sim { max-width: 1100px; padding-bottom: 40px; }
+        .net { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; user-select: none;
+               padding: 6px 12px; border-radius: 999px; font-size: 13px; font-weight: 700; border: 1px solid #3b4a63; }
+        .net.on { background: #064e3b; color: #6ee7b7; border-color: #065f46; }
+        .net.off { background: #7f1d1d; color: #fecaca; border-color: #991b1b; }
+        .card-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 8px; }
+        .card-head h2 { margin: 0; }
+        .vault { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; min-height: 34px; }
+        .jeton { width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+                 font-size: 14px; background: #f59e0b; color: #3a2400; font-weight: 800; box-shadow: 0 0 0 2px rgba(245,158,11,.25); }
+        .jeton.burned { background: #334155; color: #64748b; box-shadow: none; text-decoration: line-through; }
+        .screen { border-radius: 14px; padding: 22px 16px; text-align: center; margin-top: 10px; font-size: 20px; font-weight: 800;
+                  background: #0b1220; border: 2px solid #3b4a63; min-height: 92px; display: flex; flex-direction: column; justify-content: center; gap: 6px; transition: all .2s; }
+        .screen small { font-size: 13px; font-weight: 600; color: var(--muted); }
+        .screen.ok { background: #064e3b; border-color: #22c55e; color: #bbf7d0; }
+        .screen.ko { background: #7f1d1d; border-color: #ef4444; color: #fecaca; }
+        .tap { width: 100%; font-size: 18px; padding: 18px; margin-top: 4px; }
+        .proof { font-size: 13px; color: var(--muted); margin-top: 6px; }
+        .proof b { color: var(--accent); }
+        .log { font-size: 13px; max-height: 220px; overflow: auto; margin-top: 8px; }
+        .log div { padding: 6px 0; border-bottom: 1px solid #2a3850; }
+        .fraud button { width: 100%; text-align: left; margin-top: 8px; }
+        .code { font-family: ui-monospace, Menlo, monospace; font-size: 12px; color: #7dd3fc; word-break: break-all; }
+        .hint { background: #0b1220; border-left: 3px solid var(--accent2); padding: 10px 12px; border-radius: 8px; font-size: 14px; margin-top: 10px; }
+        .ok-t { color: #6ee7b7; } .ko-t { color: #fca5a5; }
+        .step { display: inline-block; width: 22px; height: 22px; border-radius: 50%; background: var(--accent2); color: #061634;
+                text-align: center; font-weight: 800; font-size: 13px; line-height: 22px; margin-right: 6px; }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>🧪 Simulateur : jetons hors-ligne</h1>
+        <div class="topbar">
+            <a class="link" href="index.html">App client</a>
+            <a class="link" href="transporteur.html">Espace transporteur</a>
+        </div>
+    </header>
+
+    <div class="wrap sim">
+        <div id="insecure" class="msg err" style="display:none"></div>
+
+        <div class="hint">
+            <b>Le principe :</b> Ahmad achète des jetons en ligne. Ils sont enfermés dans le <b>coffre-fort</b> de son téléphone.
+            Dans le bus, il approche son téléphone de la machine : un jeton <b>brûle</b>, la machine fait bip. <b>Sans internet.</b><br>
+            <span class="step">1</span>Rechargez et achetez un carnet
+            <span class="step">2</span>Chargez le tampon officiel dans la machine
+            <span class="step">3</span>Coupez internet des deux côtés
+            <span class="step">4</span>Approchez le téléphone
+        </div>
+
+        <div class="sim-grid" style="margin-top:16px">
+            <!-- ================= TELEPHONE ================= -->
+            <div class="card">
+                <div class="card-head">
+                    <h2>📱 Téléphone d'Ahmad</h2>
+                    <span id="phoneNet" class="net on">📶 Internet : ON</span>
+                </div>
+                <div id="phoneLogin">
+                    <p class="muted">Compte de démo : 0940000002 / 1234</p>
+                    <button id="loginBtn">Se connecter</button>
+                </div>
+                <div id="phoneApp" class="hidden">
+                    <p>Portefeuille (ShamCash) : <b id="wallet">0</b> crédits</p>
+                    <div class="row">
+                        <button id="rechargeBtn" class="secondary">Recharger 350 (ShamCash simulé)</button>
+                        <button id="buyBtn">Acheter 10 jetons (350)</button>
+                    </div>
+                    <p style="margin-top:14px">🔐 <b>Coffre-fort du téléphone</b> : <b id="vaultCount">0</b> jeton(s) disponible(s)</p>
+                    <div id="vault" class="vault"></div>
+                    <p class="muted" style="font-size:13px">Les clés secrètes des jetons ne peuvent pas sortir du coffre-fort. Une clé utilisée est détruite.</p>
+                    <button id="resetPhone" class="ghost" style="font-size:13px;padding:8px 12px">Vider le téléphone (démo)</button>
+                </div>
+                <div id="phoneMsg" class="msg"></div>
+            </div>
+
+            <!-- ================= MACHINE ================= -->
+            <div class="card">
+                <div class="card-head">
+                    <h2>🚌 Machine du bus</h2>
+                    <span id="machineNet" class="net on">📶 Internet : ON</span>
+                </div>
+                <label>Bus équipé de cette machine</label>
+                <select id="machineSel"></select>
+                <div class="row">
+                    <button id="loadKeyBtn" class="secondary">Charger le tampon officiel (au dépôt)</button>
+                    <button id="syncBtn" class="ghost">Synchroniser (au dépôt)</button>
+                </div>
+                <p id="keyState" class="muted" style="font-size:13px"></p>
+                <div id="screen" class="screen">Approchez votre téléphone<small id="challengeTxt"></small></div>
+                <div class="log" id="mLog"></div>
+                <div id="machineMsg" class="msg"></div>
+            </div>
+        </div>
+
+        <!-- ================= CONTACT NFC ================= -->
+        <div class="card" style="margin-top:16px">
+            <button id="tapBtn" class="tap">📲 Approcher le téléphone de la machine (NFC)</button>
+            <div id="proof" class="proof"></div>
+        </div>
+
+        <!-- ================= LABO DE FRAUDE ================= -->
+        <div class="card fraud">
+            <h2>🕵️ Labo de fraude : essayez de tricher</h2>
+            <p class="muted">Chaque tentative est vérifiée par la machine, hors-ligne.</p>
+            <button data-fraud="replaySame" class="ghost">1. Rejouer le dernier échange sur la même machine</button>
+            <button data-fraud="replayOther" class="ghost">2. Envoyer le dernier échange à un complice dans un autre bus</button>
+            <button data-fraud="reuseBurned" class="ghost">3. Réutiliser un jeton déjà brûlé</button>
+            <button data-fraud="extractKey" class="ghost">4. Sortir une clé du coffre-fort pour la copier sur un autre téléphone</button>
+            <button data-fraud="fakeToken" class="ghost">5. Fabriquer un faux jeton</button>
+            <div class="log" id="fraudLog"></div>
+        </div>
+    </div>
+
+    <script src="sim.js"></script>
+</body>
+</html>

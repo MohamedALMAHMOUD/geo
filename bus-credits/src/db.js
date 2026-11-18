@@ -13,6 +13,7 @@ const EMPTY = {
     buses: [],        // { id, lineId, label, t, dir, lat, lng, prevLat, prevLng, manual, updatedAt }
     favorites: [],    // { userId, lineId }
     tickets: [],      // { id, userId, lineId, status, priceCredits, createdAt, exp, usedAt, validatedBy }
+    tokens: [],       // jetons hors-ligne : { tid, userId, pub, price, status: issued|used, createdAt, usedAt, machineId }
     wallets: [],      // { userId, balanceCredits }
     recharges: [],    // { id, clientId, lineId, amountCredits, reference, status, chamcashRef, createdAt, confirmedAt }
     trips: [],        // { id, clientId, lineId, priceCredits, createdAt }

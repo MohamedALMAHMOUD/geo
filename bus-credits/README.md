@@ -64,6 +64,18 @@ Lancer : `cd mobile && npm install && npx expo install && npx expo start` (régl
 Les lieux et tracés sont dans `src/places.js` (source unique). Le géocodage texte utilise un
 petit gazetteer local (fiable hors ligne) ; à remplacer par un vrai géocodeur plus tard.
 
+## Jetons hors-ligne (simulateur : `/sim.html`)
+Validation **sans internet** ni sur le téléphone ni sur la machine :
+1. Achat en ligne d'un carnet : le téléphone crée 1 clé secrète par trajet dans son coffre-fort
+   (puce de sécurité ; WebCrypto non exportable dans le simulateur) et n'envoie que les clés publiques.
+   Le serveur signe chaque jeton (« tampon officiel », `src/tokensign.js`, ECDSA P-256).
+2. Dans le bus : la machine envoie un code aléatoire (NFC), le téléphone le signe avec la clé du jeton,
+   puis la clé est détruite. La machine vérifie localement le tampon + la signature.
+3. Au dépôt : `POST /api/machine/sync` re-vérifie chaque validation et paie la société.
+
+En production : clés Android Keystore à usage unique (`setMaxUsageCount(1)`) + vérification de
+l'attestation Android à l'achat (`/api/tokens/buy`, simulée ici).
+
 ## Endpoints principaux
 | Méthode | Route | Rôle |
 |---|---|---|

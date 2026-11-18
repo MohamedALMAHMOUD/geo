@@ -12,6 +12,8 @@ data.wallets.length = 0;
 data.recharges.length = 0;
 data.trips.length = 0;
 data.sessions.length = 0;
+data.tickets.length = 0;
+data.tokens.length = 0;
 
 function mkUser(phone, name, role, pin) {
     const { hash, salt } = hashPin(pin);
