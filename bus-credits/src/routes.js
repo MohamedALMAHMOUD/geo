@@ -571,7 +571,7 @@ router.get("/tokens/pubkey", (req, res) => {
 // Achat d'un carnet (internet necessaire a ce moment-la seulement).
 // Le telephone envoie les cles PUBLIQUES de ses jetons ; les cles secretes restent dans sa puce.
 router.post("/tokens/buy", requireAuth("client"), (req, res) => {
-    const { publicKeys } = req.body || {};
+    const { publicKeys, attestations, security } = req.body || {};
     if (!Array.isArray(publicKeys) || publicKeys.length < 1 || publicKeys.length > TOKEN_MAX_PER_BUY) {
         return res.status(400).json({ error: `Carnet de 1 à ${TOKEN_MAX_PER_BUY} jetons.` });
     }
@@ -588,9 +588,15 @@ router.post("/tokens/buy", requireAuth("client"), (req, res) => {
     }
     w.balanceCredits -= total;
 
-    const tokens = publicKeys.map((pk) => {
+    const tokens = publicKeys.map((pk, i) => {
         const tid = newId("jt");
-        data.tokens.push({ tid, userId: req.user.id, pub: pk, price: TOKEN_FARE, status: "issued", createdAt: new Date().toISOString(), usedAt: null, machineId: null });
+        const chainLen = Array.isArray(attestations) && Array.isArray(attestations[i]) ? attestations[i].length : 0;
+        data.tokens.push({
+            tid, userId: req.user.id, pub: pk, price: TOKEN_FARE, status: "issued",
+            createdAt: new Date().toISOString(), usedAt: null, machineId: null,
+            attestationCerts: chainLen,                         // a verifier en production
+            security: typeof security === "string" ? security.slice(0, 300) : null
+        });
         return { tid, token: tokensign.signToken({ tid, u: req.user.id, pub: pk, p: TOKEN_FARE, iat: Date.now() }) };
     });
     save();

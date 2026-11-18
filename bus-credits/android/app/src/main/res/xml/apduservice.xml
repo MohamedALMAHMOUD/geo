@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- requireDeviceUnlock : le telephone doit etre deverrouille pour valider un trajet
+     (un voleur ne peut pas utiliser les jetons d'un telephone verrouille). -->
+<host-apdu-service xmlns:android="http://schemas.android.com/apk/res/android"
+    android:description="@string/hce_desc"
+    android:requireDeviceUnlock="true">
+    <aid-group android:description="@string/hce_desc" android:category="other">
+        <!-- AID proprietaire : F0 + "BUSCR" -->
+        <aid-filter android:name="F04255534352" />
+    </aid-group>
+</host-apdu-service>
